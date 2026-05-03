@@ -43,6 +43,13 @@ export interface ReconstructionPayload {
   confidence: ReconstructionConfidence;
   matchedScriptId: string | null;
   usedSigns: string[];
+  /**
+   * Optional hint from the model that the signer's intent was ambiguous and
+   * a follow-up clarification turn is appropriate. Per ARCHITECTURE.md §11.1.
+   * Optional so the existing CaptionMessage payload (Phase 2 DataChannel
+   * round-trip) doesn't have to fabricate a value.
+   */
+  needsClarification?: boolean;
 }
 
 // === LiveKit DataChannel messages (§11.4) ====================================
