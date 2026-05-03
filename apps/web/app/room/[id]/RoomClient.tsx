@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
@@ -323,6 +323,20 @@ function ActiveRoom({
    * joins; once the peer joins, an empty remote tile is never shown big. */
   const showLocalAsMain = mainTile === "local" || !remoteHasParticipant;
 
+  /* the LiveLandmarkOverlay attaches to whichever tile holds the deaf
+   * participant — local for the deaf user, remote for the hearing user
+   * once the deaf peer joins. mirror only when overlaying the local tile
+   * (which is itself horizontally flipped by VideoTile). data flows over
+   * the room data channel as `debug_signals` (DeafSession publishes,
+   * room.ts dispatcher writes into useDebugSignalsStore). */
+  const deafTileIsLocal = isDeaf;
+  const deafTileIsRemote = !isDeaf && remoteRole === "deaf";
+  const showDeafOverlay =
+    view === "debug" && (deafTileIsLocal || deafTileIsRemote);
+  const deafTileInMain =
+    (deafTileIsLocal && showLocalAsMain) ||
+    (deafTileIsRemote && !showLocalAsMain);
+
   const remoteTileNode = remoteHasParticipant ? (
     <VideoTile
       label={`${remoteName ?? "guest"}${remoteRole ? ` (${remoteRole})` : ""}`}
@@ -385,10 +399,11 @@ function ActiveRoom({
             >
               {showLocalAsMain ? localTileNode : remoteTileNode}
 
-              {/* Landmark overlay tracks the local tile, not a fixed slot —
-               * so swapping main/PiP doesn't drop the face mesh. */}
-              {view === "debug" && isDeaf && showLocalAsMain ? (
-                <LiveLandmarkOverlay mirror />
+              {/* Landmark overlay tracks the deaf-participant tile wherever
+               * it is. mirror only when overlaying the LOCAL deaf user
+               * (their video element is itself horizontally flipped). */}
+              {showDeafOverlay && deafTileInMain ? (
+                <LiveLandmarkOverlay mirror={deafTileIsLocal} />
               ) : null}
 
               {isDeaf ? (
@@ -414,8 +429,8 @@ function ActiveRoom({
               className="absolute right-6 bottom-28 z-20 w-40 overflow-hidden rounded-sc-xl shadow-sc-xl sm:w-52 md:w-60 lg:w-72"
             >
               {showLocalAsMain ? remoteTileNode : localTileNode}
-              {view === "debug" && isDeaf && !showLocalAsMain ? (
-                <LiveLandmarkOverlay mirror />
+              {showDeafOverlay && !deafTileInMain ? (
+                <LiveLandmarkOverlay mirror={deafTileIsLocal} />
               ) : null}
             </motion.div>
 
@@ -458,20 +473,16 @@ function ActiveRoom({
           <TranscriptStrip />
           </div>
 
-          <AnimatePresence>
-            {view === "debug" ? (
-              <motion.div
-                key="debug-panel"
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.55, ease: [0.32, 0.72, 0, 1] }}
-                className="overflow-hidden border-t border-sc-border bg-sc-surface"
-              >
-                <DebugView />
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
+          {/* DebugView is direct-rendered (not wrapped in an AnimatePresence
+           * height-auto motion.div) — the height-auto animation could lock
+           * to 0 when children mount async (camera stream, classifier),
+           * which made the entire panel grid invisible despite being in
+           * the DOM. plain conditional render is reliable. */}
+          {view === "debug" ? (
+            <div className="border-t border-sc-border bg-sc-surface">
+              <DebugView />
+            </div>
+          ) : null}
 
           {view === "debug" ? <LogStream /> : null}
         </section>

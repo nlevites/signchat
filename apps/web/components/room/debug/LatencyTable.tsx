@@ -6,7 +6,7 @@ import { useLatencyStats } from "@/lib/diagnostics/latency-markers";
 interface LatencyRow {
   stage: string;
   label: string;
-  /** §13 budget (p50, p95) in ms; null when no formal budget. */
+  /** budget (p50, p95) in ms; null when no formal budget. */
   budgetP50: number | null;
   budgetP95: number | null;
 }
@@ -65,7 +65,7 @@ const LATENCY_ROWS: ReadonlyArray<LatencyRow> = [
 export function LatencyTable() {
   return (
     <div className="rounded-sc-xl border border-sc-border bg-sc-surface p-4 shadow-sc-xs">
-      <h3 className="mb-3 t-h3 text-sc-text">Latency (vs §13 budgets)</h3>
+      <h3 className="mb-3 t-h3 text-sc-text">Latency (vs budgets)</h3>
       <table className="w-full t-body-sm">
         <thead>
           <tr className="border-b border-sc-divider t-meta uppercase text-sc-text-3">

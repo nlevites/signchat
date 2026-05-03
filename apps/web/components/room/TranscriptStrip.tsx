@@ -58,6 +58,8 @@ function pickEntries(
         }
         break;
       case "transcript_partial":
+      case "debug_signals":
+        // not surfaced in the transcript strip; debug-only ephemera
         break;
       default: {
         const _exhaustive: never = m;
