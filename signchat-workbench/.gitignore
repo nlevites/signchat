@@ -1,0 +1,22 @@
+.DS_Store
+node_modules/
+.next/
+out/
+build/
+.turbo/
+coverage/
+
+# Env files: real values gitignored, .example committed
+.env
+.env.*
+!.env.example
+
+# TypeScript / Next incremental caches
+*.tsbuildinfo
+
+# Logs
+*.log
+
+# Editor scratch
+.vscode/
+.idea/

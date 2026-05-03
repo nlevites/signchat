@@ -5,3 +5,6 @@ node_modules/
 .env.*
 !.env.example
 *.log
+*.tsbuildinfo
+results/
+scripts/lean-options-sweep/.venv/
