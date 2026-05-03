@@ -1,0 +1,17 @@
+{
+  "name": "@signchat/sign-pipeline",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "echo '@signchat/sign-pipeline: lint not configured yet'"
+  },
+  "dependencies": {
+    "@signchat/contracts": "workspace:*",
+    "@mediapipe/tasks-vision": "0.10.17"
+  }
+}
