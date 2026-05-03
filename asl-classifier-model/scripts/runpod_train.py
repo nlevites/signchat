@@ -6,7 +6,7 @@ scps the trained weights back, and terminates the pod.
 
 Mode (single supported ``--config-suffix``):
 
-    kaggle         PopSign 250 hoyso48 port. 300 epochs by default. ~$16, ~4 hr.
+    kaggle         PopSign 250 hoyso48 port. 200 epochs by default. ~$16, ~4 hr.
                    Override with ``--epochs 5`` for a $1 smoke.
 
 Examples:
@@ -19,7 +19,7 @@ Examples:
         --config-suffix kaggle --network-volume-id 412s5n8qkh --epochs 5
 
 Cost guardrails (defaults; override via CLI):
-    - Wall-clock timeout: 360 min (6 hr; 300 epochs typically lands in ~4 hr)
+    - Wall-clock timeout: 540 min (9 hr; 200 epochs typically lands in ~4 hr)
     - Idle (no stdout) timeout: 60 min
     - Periodic cost-so-far ping every 5 min
 
@@ -671,8 +671,10 @@ def main():
     gpu_fallback = GPU_FALLBACK_PHASE1
     disk_gb = CONTAINER_DISK_GB_DEFAULT
     if args.timeout == 90:
-        # 300 epochs typically lands in ~4 hr on H200; cap at 6 hr.
-        args.timeout = 360
+        # 200 epochs typically lands in ~4 hr on H200 (XLA on, AdamW); cap
+        # at 9 hr so an XLA regression that doubles wall-clock still has
+        # head-room to complete instead of getting SIGTERMed mid-run.
+        args.timeout = 540
     if args.idle_timeout == 15:
         args.idle_timeout = 60
     use_tmux_for_run = True

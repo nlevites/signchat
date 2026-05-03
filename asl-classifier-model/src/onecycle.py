@@ -18,8 +18,10 @@ class OneCycleLR(tf.keras.optimizers.schedules.LearningRateSchedule):
     """Single-cycle warmup -> sustain -> decay schedule.
 
     Mirrors the schedule used in the 1st-place asl-signs notebook, where the
-    SAME instance is also passed as `weight_decay` to RectifiedAdam (so wd
-    follows the LR shape in absolute scale).
+    SAME instance is also passed as `weight_decay` to the optimizer (so wd
+    follows the LR shape in absolute scale). The reference notebook used
+    Lookahead-RectifiedAdam; we use AdamW for XLA compatibility, but the
+    schedule is identical.
 
     Args mirror hoyso48's signature exactly.
     """
