@@ -1,1 +1,4 @@
 run_id,timestamp,config,model,vocab_size,train_acc,val_acc,val_signer_acc,latency_ms,n_params,notes
+phase1_kaggle_1777788164,1777788791,configs/pretrain_phase1_kaggle.yaml,islr_hoyso48,250,0.0,,0.1979,60.93,1836569,"hoyso48 port: 250 PopSign signs, dim=192, 300 epochs, AWP+LateDropout"
+phase1_kaggle_1777788164,1777788791,configs/pretrain_phase1_kaggle.yaml,islr_hoyso48,250,0.0,,0.1979,60.93,1836569,"hoyso48 port: 250 PopSign signs, dim=192, 300 epochs, AWP+LateDropout"
+phase1_kaggle_1777789068,1777790127,configs/pretrain_phase1_kaggle.yaml,islr_hoyso48,250,0.3874,0.4525,0.5368,60.61,1836569,"hoyso48 port: 250 PopSign signs, dim=192, 300 epochs, AWP+LateDropout"

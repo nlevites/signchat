@@ -34,6 +34,17 @@ export interface SpeakArgs {
   duckMic: boolean;
   /** Hard cap on how long we wait for `isFinal: true` after sending. */
   timeoutMs?: number;
+  /**
+   * Phase 6 hook: fired synchronously when the first audio chunk is
+   * scheduled, before the SpeakResult promise resolves. Use this to
+   * broadcast a §11.4 caption with `playAtMs` aligned to the first
+   * audible sample (the resolved SpeakResult is too late — it fires only
+   * after the last sample's `onended`).
+   *
+   * The argument is the audioCtx-relative absolute time (seconds) of the
+   * first audible sample, identical to `SpeakResult.firstAudibleAt`.
+   */
+  onFirstAudible?: (firstAudibleAt: number) => void;
 }
 
 export interface SpeakResult {
@@ -132,6 +143,15 @@ export async function speak(args: SpeakArgs): Promise<SpeakResult> {
             if (args.duckMic) {
               args.mixer.duckMic(startedAt);
               unduckScheduled = false;
+            }
+            if (args.onFirstAudible) {
+              try {
+                args.onFirstAudible(startedAt);
+              } catch (err) {
+                LogBus.warn("elevenlabs", "onFirstAudible threw (ignored)", {
+                  error: err instanceof Error ? err.message : String(err),
+                });
+              }
             }
           }
           // Schedule the unduck against the current "last chunk" end. If

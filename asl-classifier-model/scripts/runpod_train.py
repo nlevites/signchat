@@ -591,7 +591,14 @@ def _build_run_command(mode: str, creds: Credentials, batch_size: int,
     )
     epochs_arg = f" EPOCHS={epochs}" if epochs is not None else ""
     target, _ = _PHASE1_TARGETS[mode]
-    return f"{kaggle_env} && make {target} BATCH_SIZE={batch_size}{epochs_arg}"
+    # Raise ulimits BEFORE invoking python: TF's training pipeline plus the
+    # CUDA PTX JIT compiler threads (H200 / compute 9.0) exceed the
+    # container's default RLIMIT_NPROC (~16384) and crash with
+    # "Thread tf_ creation via pthread_create() failed". 65k is the safe
+    # ceiling for Linux containers without root host changes; -n raises
+    # the FD limit too since shard reads under tf.data open many files.
+    ulimit = "ulimit -u 65535 && ulimit -n 65535"
+    return f"{ulimit} && {kaggle_env} && make {target} BATCH_SIZE={batch_size}{epochs_arg}"
 
 
 def _scp_artifacts(ssh: "SSHSession", mode: str):
@@ -770,9 +777,16 @@ def main():
             rc = ssh.run(ln_cmd, on_line=lambda *_: None)
             if rc != 0:
                 raise RuntimeError(f"symlink setup failed (exit {rc})")
-            # Rsync local caches that DON'T live on volume.
-            local_only_dirs = [d for d in Path("data/cache").iterdir()
-                               if d.is_dir() and d.name not in VOLUME_BACKED]
+            # Rsync local caches that DON'T live on volume. With
+            # --network-volume-id, a local data/cache/ is optional: when the
+            # volume holds the only copy of the cache (the asl-signs reproduce
+            # path), skip the local enumeration entirely.
+            local_cache_root = Path("data/cache")
+            local_only_dirs = (
+                [d for d in local_cache_root.iterdir()
+                 if d.is_dir() and d.name not in VOLUME_BACKED]
+                if local_cache_root.exists() else []
+            )
             if local_only_dirs:
                 sizes = sum(f.stat().st_size for d in local_only_dirs
                             for f in d.rglob("*") if f.is_file()) / 1e9
