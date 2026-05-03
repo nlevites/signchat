@@ -5,13 +5,12 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { Role } from "@signchat/contracts";
-import { Logo } from "@/components/ui/Logo";
 import { ChatPanel } from "@/components/room/ChatPanel";
 import { ControlBar } from "@/components/room/ControlBar";
-import { ConnectionBadge } from "@/components/room/ConnectionBadge";
 import { Lobby, type LobbyDeviceState } from "@/components/room/Lobby";
+import { RoomSettingsDialog } from "@/components/room/RoomSettingsDialog";
 import { VideoTile } from "@/components/room/VideoTile";
-import { ViewToggle, type ViewMode } from "@/components/room/ViewToggle";
+import type { ViewMode } from "@/components/room/ViewToggle";
 import { useDevWindowHandle } from "@/lib/dev-window";
 import { mintLiveKitToken } from "@/lib/livekit/mint-token";
 import { useLiveKitRoom } from "@/lib/livekit/room";
@@ -182,52 +181,36 @@ function ActiveRoom({
   };
 
   return (
-    <main className="flex h-dvh flex-col overflow-hidden bg-sc-bg text-sc-text">
-      <header
-        className="z-30 flex shrink-0 items-center justify-between gap-3 px-5 py-3 text-white shadow-[0_1px_0_rgba(0,0,0,0.05)]"
-        style={{ background: "var(--sc-accent-gradient)" }}
-      >
-        <div className="flex items-center gap-5">
-          <Link
-            href="/"
-            aria-label="Signchat home"
-            className="rounded-sc-md transition-opacity hover:opacity-90"
-          >
-            <Logo size={48} wordmarkSize={32} surface="overlay" />
-          </Link>
-          <span className="h-7 w-px bg-white/20" aria-hidden />
-          <div className="flex items-center gap-2">
-            <span className="t-meta uppercase text-white/65">Room</span>
-            <code className="font-mono text-[15px] font-medium text-white">
-              {roomId}
-            </code>
-          </div>
-          <ConnectionBadge />
-        </div>
-        <ViewToggle value={view} onChange={setView} />
-      </header>
-
+    <main className="relative flex h-dvh flex-col overflow-hidden bg-sc-bg text-sc-text">
       <div className="flex min-h-0 flex-1 bg-sc-surface-2">
         <section className="relative flex min-w-0 flex-1 flex-col">
-          <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden px-6 pt-6 pb-24">
-            <div className="grid h-full max-h-full w-full max-w-[1200px] grid-cols-1 content-center gap-4 md:grid-cols-2">
-              <VideoTile
-                label={`${displayName} · you (${role})`}
-                role={role}
-                videoTrack={localVideoTrack}
-                mirrored
-              />
-              {remoteVideoTrack || remoteAudioTrack || remoteName ? (
-                <VideoTile
-                  label={`${remoteName ?? "guest"}${remoteRole ? ` (${remoteRole})` : ""}`}
-                  role={remoteRole}
-                  videoTrack={remoteVideoTrack}
-                  audioTrack={remoteAudioTrack}
-                  audioOutputDeviceId={devices.audioOutputDeviceId}
-                />
-              ) : (
-                <VideoTile empty />
-              )}
+          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-28">
+              <div className="w-full shrink-0 px-1 pt-1 sm:px-2 sm:pt-2">
+                <div className="grid w-full grid-cols-2 gap-1 sm:gap-2 md:gap-3">
+                  <div className="min-w-0">
+                    <VideoTile
+                      label={`${displayName} · you (${role})`}
+                      role={role}
+                      videoTrack={localVideoTrack}
+                      mirrored
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    {remoteVideoTrack || remoteAudioTrack || remoteName ? (
+                      <VideoTile
+                        label={`${remoteName ?? "guest"}${remoteRole ? ` (${remoteRole})` : ""}`}
+                        role={remoteRole}
+                        videoTrack={remoteVideoTrack}
+                        audioTrack={remoteAudioTrack}
+                        audioOutputDeviceId={devices.audioOutputDeviceId}
+                      />
+                    ) : (
+                      <VideoTile empty />
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
 
             <ControlBar
@@ -275,6 +258,14 @@ function ActiveRoom({
           </div>
         </motion.aside>
       </div>
+
+      <RoomSettingsDialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        roomId={roomId}
+        view={view}
+        onViewChange={setView}
+      />
     </main>
   );
 }

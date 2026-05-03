@@ -12,8 +12,10 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Role } from "@signchat/contracts";
-import { Logo } from "@/components/ui/Logo";
+import { PreflightShell, preflightShell } from "@/components/shells/PreflightShell";
 import { DevicePicker } from "@/components/room/DevicePicker";
+import lobbyStyles from "@/components/room/lobby.module.css";
+import { Logo } from "@/components/ui/Logo";
 import { enumerateMediaDevices } from "@/lib/livekit/devices";
 import { usePreferencesStore } from "@/lib/stores";
 import { prewarmVad, prewarmWhisper, type PrewarmProgress } from "@/lib/whisper-prewarm";
@@ -188,78 +190,84 @@ export function Lobby({ roomId, displayName, role, onJoin, onCancel }: LobbyProp
   };
 
   return (
-    <main className="relative flex min-h-dvh justify-center bg-sc-bg px-6 py-12">
-      <div className="flex w-full max-w-[520px] flex-col gap-6">
-        <header className="flex flex-col gap-3">
-          <Logo size={56} wordmarkSize={36} surface="solid" />
-          <div className="flex flex-col gap-1">
-            <p className="t-meta uppercase text-sc-accent-700">Ready to join</p>
-            <h1 className="t-h1 text-sc-text">
-              Room <span className="font-mono">{roomId}</span>
-            </h1>
-            <p className="t-body-sm text-sc-text-2">
-              Joining as <span className="font-medium text-sc-text">{displayName}</span>
-              {" · "}
-              <span className="capitalize">{role}</span> role.
-            </p>
-          </div>
+    <PreflightShell
+      hero={<Logo size={72} wordmarkSize={44} surface="overlay" />}
+    >
+      <div className={lobbyStyles.stack}>
+        <header className={preflightShell.pageHead}>
+          <p className="mb-1 t-meta uppercase text-sc-accent-700">
+            Ready to join
+          </p>
+          <h1 className="t-h1 text-sc-text">
+            Room <span className="font-mono">{roomId}</span>
+          </h1>
+          <p className="t-body-sm text-sc-text-2">
+            Joining as{" "}
+            <span className="font-medium text-sc-text">{displayName}</span>
+            {" · "}
+            <span className="capitalize">{role}</span> role.
+          </p>
         </header>
 
-        <div className="relative">
-          <div className="sc-tile-placeholder relative aspect-[4/3] w-full overflow-hidden rounded-sc-2xl border border-sc-border shadow-sc-md">
-            <video
-              ref={videoRef}
-              className="absolute inset-0 size-full object-cover"
-              autoPlay
-              playsInline
-              muted
-            />
-            {!camEnabled || !ready ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-sc-text-2">
-                <VideoCameraSlash size={28} weight="fill" />
-                <span className="t-body-sm">
-                  {!camEnabled
-                    ? "Camera off"
-                    : error
-                      ? "Preview blocked"
-                      : "Connecting camera…"}
-                </span>
+        <div className={lobbyStyles.videoSection}>
+          <div className="relative">
+            <div className="sc-tile-placeholder relative aspect-[4/3] w-full overflow-hidden rounded-sc-2xl border border-sc-border shadow-sc-md">
+              <video
+                ref={videoRef}
+                className="absolute inset-0 size-full object-cover"
+                autoPlay
+                playsInline
+                muted
+              />
+              {!camEnabled || !ready ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-sc-text-2">
+                  <VideoCameraSlash size={28} weight="fill" />
+                  <span className="t-body-sm">
+                    {!camEnabled
+                      ? "Camera off"
+                      : error
+                        ? "Preview blocked"
+                        : "Connecting camera…"}
+                  </span>
+                </div>
+              ) : null}
+              <div className="absolute bottom-3 left-3 rounded-sc-full bg-black/55 px-3 py-1 text-[13px] font-medium text-white backdrop-blur">
+                {displayName} · you ({role})
               </div>
-            ) : null}
-            <div className="absolute bottom-3 left-3 rounded-sc-full bg-black/55 px-3 py-1 text-[13px] font-medium text-white backdrop-blur">
-              {displayName} · you ({role})
             </div>
-          </div>
 
-          <div className="absolute -bottom-5 left-1/2 z-10 -translate-x-1/2">
-            <div className="flex items-center gap-2 rounded-sc-full border border-sc-border bg-sc-surface p-2 shadow-sc-md">
-              <ToggleControl
-                label={micEnabled ? "Mute mic" : "Unmute mic"}
-                onClick={() => setMicEnabled((v) => !v)}
-                muted={!micEnabled}
-              >
-                {micEnabled ? (
-                  <Microphone size={18} weight="fill" />
-                ) : (
-                  <MicrophoneSlash size={18} weight="fill" />
-                )}
-              </ToggleControl>
-              <ToggleControl
-                label={camEnabled ? "Turn camera off" : "Turn camera on"}
-                onClick={() => setCamEnabled((v) => !v)}
-                muted={!camEnabled}
-              >
-                {camEnabled ? (
-                  <VideoCamera size={18} weight="fill" />
-                ) : (
-                  <VideoCameraSlash size={18} weight="fill" />
-                )}
-              </ToggleControl>
+            <div className="absolute -bottom-5 left-1/2 z-10 -translate-x-1/2">
+              <div className="flex items-center gap-2 rounded-sc-full border border-sc-border bg-sc-surface p-2 shadow-sc-md">
+                <ToggleControl
+                  label={micEnabled ? "Mute mic" : "Unmute mic"}
+                  onClick={() => setMicEnabled((v) => !v)}
+                  muted={!micEnabled}
+                >
+                  {micEnabled ? (
+                    <Microphone size={18} weight="fill" />
+                  ) : (
+                    <MicrophoneSlash size={18} weight="fill" />
+                  )}
+                </ToggleControl>
+                <ToggleControl
+                  label={camEnabled ? "Turn camera off" : "Turn camera on"}
+                  onClick={() => setCamEnabled((v) => !v)}
+                  muted={!camEnabled}
+                >
+                  {camEnabled ? (
+                    <VideoCamera size={18} weight="fill" />
+                  ) : (
+                    <VideoCameraSlash size={18} weight="fill" />
+                  )}
+                </ToggleControl>
+              </div>
             </div>
           </div>
         </div>
 
-        <section className="mt-4 flex flex-col gap-4 rounded-sc-2xl border border-sc-border bg-sc-surface p-5 shadow-sc-sm">
+        <div className={lobbyStyles.rail} aria-hidden />
+
+        <section className={lobbyStyles.devicesSection}>
           <p className="t-meta uppercase text-sc-text-3">Devices</p>
           <DevicePicker
             kind="videoinput"
@@ -287,35 +295,39 @@ export function Lobby({ roomId, displayName, role, onJoin, onCancel }: LobbyProp
         </section>
 
         {role === "deaf" ? (
-          <PrewarmChip
-            status={prewarmStatus}
-            progress={prewarmProgress}
-            file={prewarmFile}
-            error={prewarmError}
-          />
+          <div className={lobbyStyles.prewarmSlot}>
+            <PrewarmChip
+              status={prewarmStatus}
+              progress={prewarmProgress}
+              file={prewarmFile}
+              error={prewarmError}
+            />
+          </div>
         ) : null}
 
-        <button
-          type="button"
-          onClick={() => void handleJoin()}
-          disabled={
-            !ready || joining || (role === "deaf" && prewarmStatus !== "ready")
-          }
-          className="sc-luminous mt-2 inline-flex h-12 w-full items-center justify-center rounded-sc-full px-6 text-[15px] font-medium transition-[transform,filter] duration-200 hover:-translate-y-px hover:brightness-105 active:translate-y-0 disabled:opacity-40 disabled:pointer-events-none"
-        >
-          {joining ? "Joining…" : "Join now"}
-        </button>
+        <div className={lobbyStyles.actions}>
+          <button
+            type="button"
+            onClick={() => void handleJoin()}
+            disabled={
+              !ready || joining || (role === "deaf" && prewarmStatus !== "ready")
+            }
+            className="sc-luminous inline-flex h-12 w-full shrink-0 items-center justify-center rounded-sc-full px-6 text-[15px] font-medium transition-[transform,filter] duration-200 hover:-translate-y-px hover:brightness-105 active:translate-y-0 disabled:opacity-40 disabled:pointer-events-none"
+          >
+            {joining ? "Joining…" : "Join now"}
+          </button>
 
-        <button
-          type="button"
-          onClick={onCancel}
-          className="inline-flex items-center justify-center gap-2 self-center rounded-sc-md px-3 py-2 t-label text-sc-text-3 transition-colors duration-150 hover:text-sc-text-2"
-        >
-          <ArrowLeft size={14} weight="bold" />
-          Back
-        </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className={`inline-flex items-center justify-center gap-2 self-center rounded-sc-md px-3 py-2 t-label text-sc-text-3 transition-colors duration-150 hover:text-sc-text-2 ${lobbyStyles.backBtn}`}
+          >
+            <ArrowLeft size={14} weight="bold" />
+            Back
+          </button>
+        </div>
       </div>
-    </main>
+    </PreflightShell>
   );
 }
 

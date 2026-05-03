@@ -1,0 +1,41 @@
+.stack {
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
+  min-height: min-content;
+}
+
+.rail {
+  height: 1px;
+  width: 100%;
+  flex-shrink: 0;
+  background: #e3e3e2;
+}
+
+.videoSection {
+  position: relative;
+  padding-bottom: 36px;
+}
+
+.devicesSection {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 24px;
+}
+
+.prewarmSlot {
+  padding-top: 8px;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex-shrink: 0;
+  padding-top: 24px;
+}
+
+.backBtn {
+  padding-top: 8px;
+}
