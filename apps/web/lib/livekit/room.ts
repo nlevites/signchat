@@ -16,10 +16,19 @@ import {
   Track,
 } from "livekit-client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Role } from "@signchat/contracts";
+import type {
+  ParticipantInfo,
+  Role,
+  RoomDataMessage,
+} from "@signchat/contracts";
+import {
+  publishRoomDataMessage,
+  subscribeRoomDataMessages,
+} from "@/lib/livekit/data-channel";
 import {
   type ConnectionState as RoomConnectionState,
   useRoomStore,
+  useTranscriptStore,
 } from "@/lib/stores";
 import { toast } from "@/lib/stores/toast";
 
@@ -45,6 +54,25 @@ export interface LiveKitRoomState {
   toggleMic: () => Promise<void>;
   toggleCamera: () => Promise<void>;
   leave: () => Promise<void>;
+  publish: (msg: RoomDataMessage) => Promise<void>;
+}
+
+function dispatchRoomDataMessage(
+  msg: RoomDataMessage,
+  _from: ParticipantInfo,
+): void {
+  const t = useTranscriptStore.getState();
+  if (msg.kind === "transcript_partial") {
+    t.upsertPartial(msg.id, { from: msg.from, text: msg.text, ts: msg.ts });
+    return;
+  }
+  if (msg.kind === "transcript_final") {
+    t.appendMessage(msg);
+    t.finalizePartial(msg.id);
+    return;
+  }
+  // chat + caption
+  t.appendMessage(msg);
 }
 
 // livekit logs at warn for normal lifecycle events ("Abort connection attempt
@@ -217,6 +245,7 @@ export function useLiveKitRoom(args: UseLiveKitRoomArgs): LiveKitRoomState {
     r.on(RoomEvent.LocalTrackPublished, onLocalTrackPublished);
     r.on(RoomEvent.LocalTrackUnpublished, onLocalTrackUnpublished);
     r.on(RoomEvent.Disconnected, onDisconnected);
+    const unsubscribeData = subscribeRoomDataMessages(r, dispatchRoomDataMessage);
 
     (async () => {
       try {
@@ -261,6 +290,7 @@ export function useLiveKitRoom(args: UseLiveKitRoomArgs): LiveKitRoomState {
 
     return () => {
       cancelled = true;
+      unsubscribeData();
       r.off(RoomEvent.ConnectionStateChanged, onConnectionStateChanged);
       r.off(RoomEvent.ParticipantConnected, onParticipantConnected);
       r.off(RoomEvent.ParticipantDisconnected, onParticipantDisconnected);
@@ -319,6 +349,12 @@ export function useLiveKitRoom(args: UseLiveKitRoomArgs): LiveKitRoomState {
     }
   }, []);
 
+  const publish = useCallback(async (msg: RoomDataMessage) => {
+    const r = roomRef.current;
+    if (!r) throw new Error("room not connected");
+    await publishRoomDataMessage(r, msg);
+  }, []);
+
   return {
     room,
     localVideoTrack,
@@ -333,5 +369,6 @@ export function useLiveKitRoom(args: UseLiveKitRoomArgs): LiveKitRoomState {
     toggleMic,
     toggleCamera,
     leave,
+    publish,
   };
 }

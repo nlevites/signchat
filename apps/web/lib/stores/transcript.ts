@@ -27,21 +27,9 @@ export const useTranscriptStore = create<TranscriptState>((set) => ({
     })),
   finalizePartial: (id) =>
     set((state) => {
-      const partial = state.partialsByUtterance[id];
-      if (!partial) return state;
+      if (!(id in state.partialsByUtterance)) return state;
       const { [id]: _drop, ...rest } = state.partialsByUtterance;
-      const finalMsg: RoomDataMessage = {
-        v: 1,
-        kind: "transcript_final",
-        id,
-        ts: partial.ts,
-        from: partial.from,
-        text: partial.text,
-      };
-      return {
-        messages: [...state.messages, finalMsg],
-        partialsByUtterance: rest,
-      };
+      return { partialsByUtterance: rest };
     }),
   clear: () => set({ messages: [], partialsByUtterance: {} }),
 }));

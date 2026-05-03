@@ -12,6 +12,7 @@ import { ConnectionBadge } from "@/components/room/ConnectionBadge";
 import { Lobby, type LobbyDeviceState } from "@/components/room/Lobby";
 import { VideoTile } from "@/components/room/VideoTile";
 import { ViewToggle, type ViewMode } from "@/components/room/ViewToggle";
+import { useDevWindowHandle } from "@/lib/dev-window";
 import { mintLiveKitToken } from "@/lib/livekit/mint-token";
 import { useLiveKitRoom } from "@/lib/livekit/room";
 import { useRoomStore } from "@/lib/stores";
@@ -164,6 +165,7 @@ function ActiveRoom({
     toggleMic,
     toggleCamera,
     leave,
+    publish,
   } = useLiveKitRoom({
     audioInputDeviceId: devices.audioInputDeviceId,
     videoInputDeviceId: devices.videoInputDeviceId,
@@ -171,6 +173,8 @@ function ActiveRoom({
     initialMicEnabled: devices.micEnabled,
     initialCamEnabled: devices.camEnabled,
   });
+
+  useDevWindowHandle(publish);
 
   const handleLeave = async () => {
     await leave();
