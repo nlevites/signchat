@@ -1,0 +1,89 @@
+{
+  "generated": "2026-05-03T10:16:55.382Z",
+  "notes": [
+    "Logos used under nominative-fair-use to indicate genuine integrations.",
+    "Integration logos sourced from Wikimedia Commons; provider logos from the `simple-icons` package (CC0).",
+    "Brand owners retain trademark; Signchat displays these marks only to indicate real integration / provider support."
+  ],
+  "integrations": [
+    {
+      "slug": "zoom",
+      "vendor": "Zoom",
+      "file": "public/integrations/zoom.svg",
+      "source": "https://upload.wikimedia.org/wikipedia/commons/7/7b/Zoom_Communications_Logo.svg",
+      "license": "Brand owner trademark; mark used under nominative fair use"
+    },
+    {
+      "slug": "teams",
+      "vendor": "Microsoft Teams",
+      "file": "public/integrations/teams.svg",
+      "source": "https://upload.wikimedia.org/wikipedia/commons/0/07/Microsoft_Office_Teams_%282025%E2%80%93present%29.svg",
+      "license": "Brand owner trademark; mark used under nominative fair use"
+    },
+    {
+      "slug": "meet",
+      "vendor": "Google Meet",
+      "file": "public/integrations/meet.svg",
+      "source": "https://upload.wikimedia.org/wikipedia/commons/9/9b/Google_Meet_icon_%282020%29.svg",
+      "license": "Brand owner trademark; mark used under nominative fair use"
+    },
+    {
+      "slug": "slack",
+      "vendor": "Slack",
+      "file": "public/integrations/slack.svg",
+      "source": "https://upload.wikimedia.org/wikipedia/commons/d/d5/Slack_icon_2019.svg",
+      "license": "Brand owner trademark; mark used under nominative fair use"
+    },
+    {
+      "slug": "discord",
+      "vendor": "Discord",
+      "file": "public/integrations/discord.svg",
+      "source": "https://upload.wikimedia.org/wikipedia/en/9/98/Discord_logo.svg",
+      "license": "Brand owner trademark; mark used under nominative fair use"
+    },
+    {
+      "slug": "webex",
+      "vendor": "Webex",
+      "file": "public/integrations/webex.svg",
+      "source": "https://upload.wikimedia.org/wikipedia/commons/f/f9/Cisco_Webex_logo_-_Brandlogos.net.svg",
+      "license": "Brand owner trademark; mark used under nominative fair use"
+    }
+  ],
+  "providers": [
+    {
+      "slug": "onnx",
+      "vendor": "ONNX Runtime",
+      "file": "public/providers/onnx.svg",
+      "source": "simple-icons npm",
+      "license": "CC0-1.0 (icon data) — vendor retains trademark"
+    },
+    {
+      "slug": "mediapipe",
+      "vendor": "MediaPipe",
+      "file": "public/providers/mediapipe.svg",
+      "source": "simple-icons npm",
+      "license": "CC0-1.0 (icon data) — vendor retains trademark"
+    },
+    {
+      "slug": "gemini",
+      "vendor": "Google Gemini",
+      "file": "public/providers/gemini.svg",
+      "source": "simple-icons npm",
+      "license": "CC0-1.0 (icon data) — vendor retains trademark"
+    },
+    {
+      "slug": "elevenlabs",
+      "vendor": "ElevenLabs",
+      "file": "public/providers/elevenlabs.svg",
+      "source": "simple-icons npm",
+      "license": "CC0-1.0 (icon data) — vendor retains trademark"
+    },
+    {
+      "slug": "livekit",
+      "vendor": "LiveKit",
+      "file": "public/providers/livekit.svg",
+      "source": "simple-icons npm",
+      "license": "CC0-1.0 (icon data) — vendor retains trademark"
+    }
+  ]
+}
