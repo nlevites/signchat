@@ -13,13 +13,13 @@
 Signchat is a 1:1 real-time video chat between a **Deaf signer** and a **Hearing user**. The signer's browser owns the entire sign-to-voice turn:
 
 - MediaPipe Tasks Vision extracts hand + face + pose landmarks from the local outgoing camera track.
-- An `onnxruntime-web` session classifies sliding windows of those landmarks against the 250-class PopSign / Kaggle ASL Signs model.
+- An `onnxruntime-web` session classifies sliding windows of those landmarks against a custom ASL classifier model.
 - The accumulated tokens plus a rolling Hearing transcript context are sent **browser-direct** to OpenRouter, which returns one casual English sentence as JSON.
 - The signer reviews the sentence inline (Approve / Edit / Re-sign / Discard).
 - On Approve, the browser opens a streaming WSS to ElevenLabs Flash v2.5, decodes the returned 24 kHz PCM, and mixes it with the live microphone in a Web Audio graph.
 - The mixed audio is published to LiveKit as one persistent `signchat-voice` track that the Hearing user subscribes to as if it were a normal voice channel.
 
-The reverse direction — Hearing voice → Deaf captions — runs **on the signer's machine only**: the Deaf browser subscribes to the Hearing user's remote audio track, runs Silero VAD-gated `whisper-base.en` over it, and broadcasts streaming partial captions back to the Hearing user over the LiveKit data channel. Both tiles render live captions of the speaker on that tile in real time.
+The reverse direction — Hearing voice → Deaf captions — is reached **browser-direct** from the Deaf side: the Deaf browser subscribes to the Hearing user's remote audio track, streams it to ElevenLabs voice-to-text, and broadcasts the streaming partials back to the Hearing user over the LiveKit data channel. Both tiles render live captions of the speaker on that tile in real time.
 
 Vercel is **not** on the per-turn data path. It mints three short-lived credentials at room-join — a LiveKit JWT, a credit-capped OpenRouter session key, and an ElevenLabs signed WSS URL — and otherwise serves static assets. There is no server-side LiveKit bot, no TTS relay, no WebSocket gateway.
 
@@ -69,7 +69,7 @@ flowchart LR
   Deaf ==>|"TTS"| EL
 ```
 
-What runs inside the Deaf browser — MediaPipe + ONNX classifier, the mode controller, the inline preview, the Web Audio `signchat-voice` mixer, Silero VAD + Whisper for the Hearing user's captions — is described in §5 (component reference) and §8 (audio pipeline). The Hearing browser is much simpler: it publishes camera + mic and renders incoming captions.
+What runs inside the Deaf browser — MediaPipe + ONNX classifier, the mode controller, the inline preview, the Web Audio `signchat-voice` mixer, ElevenLabs voice-to-text for the Hearing user's captions — is described in §5 (component reference) and §8 (audio pipeline). The Hearing browser is much simpler: it publishes camera + mic and renders incoming captions.
 
 ### 3.1 Inside the Deaf browser
 
@@ -78,7 +78,7 @@ flowchart LR
   cam["📷 camera"]
   mic["🎤 mic"]
   mp["<img src='https://cdn.simpleicons.org/mediapipe/0097A7' width='22' /> MediaPipe<br/>face + hands + pose"]
-  onnx["<img src='https://cdn.simpleicons.org/onnx/005CED' width='22' /> ONNX Runtime<br/>250-class classifier"]
+  onnx["<img src='https://cdn.simpleicons.org/onnx/005CED' width='22' /> ONNX Runtime<br/>custom ASL classifier"]
   mode["🎛️ Mode controller<br/>Auto / Manual"]
   preview["✅ Inline preview<br/>Approve / Edit / Re-sign"]
   llm["<img src='https://cdn.simpleicons.org/openrouter/6E6E6E' width='22' /> Gemini 3 Flash<br/>via OpenRouter"]
@@ -86,18 +86,17 @@ flowchart LR
   mix["🔊 Web Audio mixer<br/>signchat-voice"]
   lk["<img src='https://cdn.simpleicons.org/livekit/FF3300' width='22' /> LiveKit Room"]
   remote["📥 Hearing audio<br/>subscribed"]
-  vad["🛎️ Silero VAD"]
-  whisper["<img src='https://cdn.simpleicons.org/google/4285F4' width='22' /> Whisper<br/>transformers.js"]
+  el_stt["<img src='https://cdn.simpleicons.org/elevenlabs/000000' width='22' /> ElevenLabs<br/>voice-to-text"]
 
   cam --> mp --> onnx --> mode --> llm --> preview --> tts
   mic --> mix
   tts --> mix --> lk
   cam --> lk
 
-  remote --> vad --> whisper --> lk
+  remote --> el_stt --> lk
 ```
 
-The signing direction is the top row. The captioning direction (Hearing voice → Deaf-side Whisper → DataChannel) is the bottom row. Everything in this diagram runs in one browser tab.
+The signing direction is the top row. The captioning direction (Hearing voice → ElevenLabs voice-to-text → DataChannel) is the bottom row. Everything in this diagram runs in one browser tab.
 
 ---
 
@@ -154,7 +153,7 @@ Workspace tooling: `pnpm` with workspace protocol, `pnpm -w typecheck && pnpm -w
 - Execution provider: **WASM only**. WebGPU was empirically ~1000× slower for this Squeezeformer + dynamic-time-dim workload; re-evaluate when the WebGPU EP gains shader caching for variable shapes.
 - Model: 21 MB fp32 ONNX at `apps/web/public/models/asl-signs/asl-signs.onnx`, with `apps/web/public/models/asl-signs/labels.json` as the index→label map.
 - Input: `Float32Array` shape `[T, 543, 3]` (T ≤ 48 frames, 543 landmarks per frame in canonical face / left-hand / pose / right-hand order, x/y/z).
-- Output: 250-class logits → softmax → top-k.
+- Output: classifier logits → softmax → top-k.
 - Inference cadence: 500 ms sliding window (configurable via Debug-view slider). The session and label table live in module scope and are warmed on room-join; first-capture-of-session has a hot session.
 
 ### 5.5 Mode controller
@@ -185,17 +184,12 @@ Workspace tooling: `pnpm` with workspace protocol, `pnpm -w typecheck && pnpm -w
 - Response: `{ sentence, confidence, matchedScriptId, usedSigns }` per the contract in §11.3.
 - **Boot-time catalog check.** First time the Deaf browser joins a room, it fetches `https://openrouter.ai/api/v1/models` (no auth needed) and `console.warn`s if any of the three dropdown ids is missing from the catalog. A small `model unavailable` chip appears on the picker but does not block entry.
 
-### 5.8 Speech-to-text — Whisper, on the Deaf machine only
+### 5.8 Speech-to-text — ElevenLabs voice-to-text, browser-direct
 
-- **Where it runs.** Browser main thread on the Deaf user's machine. The Hearing browser does not run STT. The Deaf side subscribes to the Hearing user's `RemoteAudioTrack` via livekit-client, pipes the decoded audio into a Web Audio `AudioWorkletNode` that buffers Float32 PCM frames at 16 kHz mono, and routes them through Silero VAD into Whisper.
-- **Library.** `@huggingface/transformers@3.0.2`, **CDN-loaded** from `https://esm.sh` via the same `new Function('u', 'return import(u)')` shim as onnxruntime-web (§5.4). Not in `package.json`. Picks WebGPU + `dtype: "fp32"` when available, falls back to WASM + `dtype: "q8"`. Silero VAD blob fetched from `https://huggingface.co/onnx-community/silero-vad/resolve/main/onnx/model.onnx`.
-- **Streaming strategy.** A small Silero VAD (~1 MB ONNX) inspects each ~30 ms PCM frame and emits speech-start / speech-end events. Whisper inference runs on the closed utterance plus, while speech is ongoing, on a 1-second rolling window for early-partial captions. p50 partial latency is `utterance-length + ~300 ms`. Silence is never transcribed.
-- **Model dropdown** (in Debug view, persists to `localStorage` as `signchat:whisper-model-id`):
-  - `Xenova/whisper-tiny.en` — ~40 MB, lowest quality, fastest cold start.
-  - `Xenova/whisper-base.en` — ~80 MB, **default**.
-  - `Xenova/whisper-small.en` — ~250 MB, highest accuracy.
-- **Cold-start: pre-warmed in the lobby.** The Whisper variant binary + the Silero VAD ONNX are downloaded and warmed up while the Deaf user is on the device-preview lobby. By Join time the model is in IndexedDB and the inference pipeline is hot. The Hearing user is unaffected.
-- **Quality indicator + manual downgrade.** When rolling p50 partial latency exceeds 1.5 s for three consecutive utterances, the Hearing tile shows a small `captions: degraded` chip and the Debug view hints to pick a smaller variant. There is no auto-failover to Hearing-side STT.
+- **Where it runs.** Reached browser-direct from the Deaf user's machine. The Hearing browser does not run STT. The Deaf side subscribes to the Hearing user's `RemoteAudioTrack` via livekit-client, packages decoded PCM frames, and streams them to ElevenLabs voice-to-text over a signed WSS URL minted at room-join (§10).
+- **Streaming strategy.** ElevenLabs returns streaming partials as it transcribes; finals supersede partials with the same `id`. The Deaf browser forwards each partial to the Hearing tile over the LiveKit data channel as `transcript_partial`, and finals as `transcript_final`. Silence is not transcribed.
+- **Cold-start: pre-warmed in the lobby.** The voice-to-text WSS is opened while the Deaf user is on the device-preview lobby so the first hearing utterance after Join doesn't pay the connection-handshake cost.
+- **Quality indicator.** When rolling p50 partial latency exceeds 1.5 s for three consecutive utterances, the Hearing tile shows a small `captions: degraded` chip. WSS errors mid-utterance surface a `Captions unavailable` toast on the Deaf side; chat continues.
 
 ### 5.9 Text-to-speech — ElevenLabs, browser-direct WSS
 
@@ -216,7 +210,6 @@ Both tiles render live captions in real time. Detail is in §6.
 
 - `localStorage` for **preferences only**:
   - `signchat:model-id` — selected OpenRouter model id.
-  - `signchat:whisper-model-id` — selected Whisper variant.
   - `signchat:auto-thresholds` — `{ top1, top2, silenceMs, intervalMs }`.
   - `signchat:mode` — `"auto" | "manual"`.
   - `signchat:last-devices` — `{ audioInputId, videoInputId, audioOutputId }`.
@@ -226,11 +219,11 @@ Both tiles render live captions in real time. Detail is in §6.
 
 ## 6. Live captions and transcript alignment
 
-Both tiles show live captions of the speaker on that tile. The two directions are asymmetric because Whisper streams partials directly while sign reconstruction has an LLM-bounded latency.
+Both tiles show live captions of the speaker on that tile. The two directions are asymmetric because ElevenLabs voice-to-text streams partials directly while sign reconstruction has an LLM-bounded latency.
 
 ### 6.1 Hearing tile — word-by-word streaming partials
 
-Whisper produces streaming partials every ~200–500 ms. Each partial replaces the previous one in place:
+ElevenLabs voice-to-text produces streaming partials every ~200–500 ms. Each partial replaces the previous one in place:
 
 ```
 "so"  →  "so I"  →  "so I was"  →  "so I was thinking"
@@ -252,8 +245,8 @@ The Deaf browser publishes the caption as a `caption` DataChannel message at the
 ### 6.3 DataChannel reliability per kind
 
 - `caption` (Deaf-stitched final sentence) — `reliable: true`. Must arrive.
-- `transcript_partial` (Hearing-side Whisper partial) — `reliable: false`. Lossy datagram; later partials supersede earlier ones.
-- `transcript_final` (Hearing-side Whisper final) — `reliable: true`.
+- `transcript_partial` (ElevenLabs voice-to-text partial) — `reliable: false`. Lossy datagram; later partials supersede earlier ones.
+- `transcript_final` (ElevenLabs voice-to-text final) — `reliable: true`.
 - `chat` (manual chat composer) — `reliable: true`.
 
 Out-of-order partials are discriminated by `(speakerIdentity, id, ts)`; finals always supersede partials with the same `id`. Partial publish is coalesced client-side at 4 Hz to keep the data channel from saturating during heavy speech.
@@ -272,7 +265,7 @@ The system has **no fallbacks**. A turn either succeeds through the primary path
 | ElevenLabs signed URL expired mid-turn | Toast: `Voice unavailable — re-sign` | Re-mint the signed URL via `/api/elevenlabs/signed-url`; signer re-commits. |
 | ElevenLabs WSS error mid-stream | Toast: `Voice interrupted — re-sign` | Drop the partial caption (do **not** broadcast); signer re-commits. |
 | LiveKit reconnect fires mid-turn | Connection-state badge already shown by `livekit-client` | Mid-flight audio may be lost; on re-connect, signer re-commits the in-flight turn. |
-| Whisper or VAD fail to load | Toast on the Deaf side: `Captions unavailable` | Chat continues; LLM context is empty for the next turn (the system prompt tolerates that). |
+| ElevenLabs voice-to-text WSS fails | Toast on the Deaf side: `Captions unavailable` | Chat continues; LLM context is empty for the next turn (the system prompt tolerates that). |
 | MediaPipe / ONNX fail to load | Toast on the Deaf side: `Sign classifier unavailable` | The sign capture flow is disabled; the chat composer falls back to text input. |
 
 A failed turn never broadcasts a partial caption to the Hearing user — silence is cleaner than a half-caption with no audio.
@@ -369,7 +362,6 @@ Every tunable knob lives in the Debug view, not the Settings drawer. The `Settin
 | `silenceMs` | `2000` | `signchat:auto-thresholds` |
 | `inferenceIntervalMs` | `500` | `signchat:auto-thresholds` |
 | OpenRouter model | `google/gemini-3-flash-preview` | `signchat:model-id` |
-| Whisper variant | `Xenova/whisper-base.en` | `signchat:whisper-model-id` |
 | Mode | `auto` | `signchat:mode` |
 
 ### 9.3 Buffer-admit logic
@@ -522,7 +514,7 @@ export interface ParticipantInfo {
 }
 
 export interface SignToken {
-  label: string;                                 // PopSign label, e.g. "PIZZA"
+  label: string;                                 // classifier label, e.g. "PIZZA"
   score: number;                                 // softmax probability
   ts: number;                                    // performance.now() at admit
   via: "stable" | "band";
@@ -625,10 +617,9 @@ End-to-end target: **sign-end → first audible byte at the Hearing user — p50
 | LiveKit publish + SFU propagation | 100 ms | 300 ms | One regional hop. |
 | **Sign-end → audio audible (total)** | **≈ 950 ms** | **≈ 1.6 s** | Within the spec budget. |
 | Hearing mic → Deaf-side decode (LiveKit Opus) | 150 ms | 350 ms | One regional hop. |
-| Silero VAD speech-start | < 100 ms | < 200 ms | First ~3 voiced frames. |
-| Whisper inference (1 s rolling window, base.en, WebGPU) | 300 ms | 700 ms | WASM-only path adds ~50 %. |
+| ElevenLabs voice-to-text first partial | 400 ms | 900 ms | WSS kept warm from lobby. |
 | DataChannel publish back to the Hearing tile | 100 ms | 250 ms | Lossy datagram for partials. |
-| **Hearing speech → caption partial (total)** | **≈ 700 ms** | **≈ 1.5 s** | Achievable on WebGPU; WASM-only crosses 1.5 s and triggers the degraded chip. |
+| **Hearing speech → caption partial (total)** | **≈ 700 ms** | **≈ 1.5 s** | Crosses 1.5 s triggers the degraded chip. |
 
 Out-of-budget regression detection: client-side timing markers around each stage are exposed in the Debug view's `LLM I/O` and `Captions` sections.
 
@@ -642,13 +633,13 @@ The trust boundary is the network edge between the browser and Vercel, plus the 
   - LiveKit JWT (1 h TTL, scoped to one room + one identity).
   - OpenRouter session key (credit-capped child of the management key; visible in DevTools but bounded by `limitCredits`).
   - ElevenLabs signed WSS URL (short-lived, voice-scoped).
-  - Static assets including the 21 MB `asl-signs.onnx` and Whisper variant binaries.
+  - Static assets including the custom ASL classifier ONNX model.
   - Stitched LLM output (sentence text) and streamed TTS PCM.
   - All `RoomDataMessage` traffic flowing through the LiveKit data channel.
 - **What `/api/livekit/token` sees.** `LIVEKIT_*` env vars; sanitized `roomId`, `identity`, `role`. Returns a JWT; never logs anything beyond `keyHash`-style safe identifiers.
 - **What `/api/openrouter/session-key` sees.** `OPENROUTER_MANAGEMENT_API_KEY`; same sanitized inputs. Calls the OpenRouter Management API. Logs `keyHash`, `roomId`, `identity`, `createdAt`. **Never logs `apiKey`.**
 - **What `/api/elevenlabs/signed-url` sees.** `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`; same sanitized inputs. Returns the signed URL + expiry only.
-- **What LiveKit Cloud sees.** Audio + video + DataChannel payloads (including stitched sentences and Whisper transcripts). DTLS-SRTP in transit.
+- **What LiveKit Cloud sees.** Audio + video + DataChannel payloads (including stitched sentences and voice-to-text transcripts). DTLS-SRTP in transit.
 - **What OpenRouter sees.** System prompt, vocabulary block, recognized signs, last 4 hearing-transcript lines, the model id. Per OpenRouter's terms, prompts and completions may be logged by the provider.
 - **What ElevenLabs sees.** The sanitized sentence text and voice id only.
 - **Threat model: secret leakage.** The single leakage path is a typo in a `NEXT_PUBLIC_*` variable. Avoided by never introducing one. Root API keys never enter the browser bundle; child credentials are scoped, capped, and short-lived.
@@ -664,7 +655,7 @@ There is no long-running Node.js server. "Node runtime" on Vercel means each API
 
 ### 15.1 What Vercel hosts
 
-- **Static frontend** (JS bundle, CSS, the 21 MB ONNX model, brand images, Whisper variant binaries cached at first run) — pushed to Vercel's global CDN.
+- **Static frontend** (JS bundle, CSS, the custom ASL classifier ONNX model, brand images) — pushed to Vercel's global CDN.
 - **Server-rendered pages** (`apps/web/app/page.tsx`, `apps/web/app/room/[id]/page.tsx`) — bundled per route, run on demand on a Vercel Function in `pdx1`.
 - **API routes** — each route is its own Vercel Function. Stateless and independent. Two concurrent room joins fire two separate Lambda instances.
 
@@ -683,7 +674,7 @@ Cold Node Lambda: ~150–300 ms platform overhead. Warm Lambda (called within ~5
 
 - **LiveKit signaling + SFU** — LiveKit Cloud (us-west PoP). Vercel only mints the JWT; the WebSocket connection is browser ↔ LiveKit Cloud.
 - **OpenRouter, ElevenLabs** — third-party SaaS, called browser-direct.
-- **MediaPipe, ONNX classifier, Whisper, Silero VAD, the entire mode controller, the audio mixer** — all in the Deaf user's browser. The static models are served from Vercel's CDN but execute client-side.
+- **MediaPipe, ONNX classifier, the entire mode controller, the audio mixer** — all in the Deaf user's browser. ElevenLabs voice-to-text is reached browser-direct over a signed WSS. The custom classifier model is served from Vercel's CDN but executes client-side.
 - **No database, no WebSocket server, no cron, no background job.**
 
 ### 15.4 Deploy workflow
@@ -728,7 +719,7 @@ A future Electron app ("Bridge") routes the same Deaf-side reconstructed audio i
 
 - Two browsers in different cities join `signchat.org/room/<id>`, see each other's video, and the Hearing user hears one mixed `signchat-voice` audio track that contains both real signer mic audio and reconstructed synthetic speech.
 - The Deaf signer's browser performs ONNX sign recognition locally on the signer's own camera stream.
-- The Deaf signer's browser transcribes the Hearing user's streamed LiveKit audio locally with VAD-gated Whisper and broadcasts streaming partials over the data channel.
+- The Deaf signer's browser streams the Hearing user's LiveKit audio to ElevenLabs voice-to-text browser-direct and broadcasts the streaming partials over the data channel.
 - The Hearing tile shows live word-by-word partials of the Hearing user's voice in real time. The Deaf tile shows sign-token chips during signing and the full reconstructed sentence pinned during TTS playback, aligned to the first audible sample.
 - The Deaf signer's browser calls OpenRouter directly using a Vercel-minted, credit-capped session key.
 - The Deaf signer's browser calls ElevenLabs directly using a Vercel-minted signed WSS URL.
