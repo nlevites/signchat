@@ -11,6 +11,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "0.10.17",
     "@phosphor-icons/react": "2.1.10",
     "@signchat/contracts": "workspace:*",
     "@signchat/prompts": "workspace:*",

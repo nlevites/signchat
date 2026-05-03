@@ -2,23 +2,17 @@
 
 import {
   ArrowLeft,
-  CheckCircle,
-  CircleNotch,
   Microphone,
   MicrophoneSlash,
   VideoCamera,
   VideoCameraSlash,
-  WarningCircle,
 } from "@phosphor-icons/react/dist/ssr";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Role } from "@signchat/contracts";
-import { PreflightShell, preflightShell } from "@/components/shells/PreflightShell";
-import { DevicePicker } from "@/components/room/DevicePicker";
-import lobbyStyles from "@/components/room/lobby.module.css";
 import { Logo } from "@/components/ui/Logo";
+import { DevicePicker } from "@/components/room/DevicePicker";
+import { VoicePicker } from "@/components/room/VoicePicker";
 import { enumerateMediaDevices } from "@/lib/livekit/devices";
-import { usePreferencesStore } from "@/lib/stores";
-import { prewarmVad, prewarmWhisper, type PrewarmProgress } from "@/lib/whisper-prewarm";
 
 export interface LobbyDeviceState {
   audioInputDeviceId: string;
@@ -36,12 +30,9 @@ interface LobbyProps {
   onCancel: () => void;
 }
 
-type PrewarmStatus = "idle" | "preparing" | "ready" | "error";
-
 export function Lobby({ roomId, displayName, role, onJoin, onCancel }: LobbyProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const whisperModelId = usePreferencesStore((s) => s.whisperModelId);
   const [audioInputs, setAudioInputs] = useState<readonly MediaDeviceInfo[]>([]);
   const [videoInputs, setVideoInputs] = useState<readonly MediaDeviceInfo[]>([]);
   const [audioOutputs, setAudioOutputs] = useState<readonly MediaDeviceInfo[]>([]);
@@ -53,12 +44,6 @@ export function Lobby({ roomId, displayName, role, onJoin, onCancel }: LobbyProp
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [joining, setJoining] = useState(false);
-  const [prewarmStatus, setPrewarmStatus] = useState<PrewarmStatus>(
-    role === "deaf" ? "preparing" : "ready",
-  );
-  const [prewarmProgress, setPrewarmProgress] = useState(0);
-  const [prewarmFile, setPrewarmFile] = useState<string | null>(null);
-  const [prewarmError, setPrewarmError] = useState<string | null>(null);
 
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -120,6 +105,7 @@ export function Lobby({ roomId, displayName, role, onJoin, onCancel }: LobbyProp
       cancelled = true;
       stopStream();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // re-acquire on selection / enable changes. skip before the first successful
@@ -128,43 +114,8 @@ export function Lobby({ roomId, displayName, role, onJoin, onCancel }: LobbyProp
   useEffect(() => {
     if (!streamRef.current && !ready) return;
     void acquireStream(audioInputId, videoInputId, micEnabled, camEnabled);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [audioInputId, videoInputId, micEnabled, camEnabled]);
-
-  // deaf-side: prewarm whisper + silero vad while the user picks devices, so
-  // models are hot in indexeddb by join. hearing role skips this entirely.
-  useEffect(() => {
-    if (role !== "deaf") return;
-    let cancelled = false;
-    setPrewarmStatus("preparing");
-    setPrewarmProgress(0);
-    setPrewarmFile(null);
-    setPrewarmError(null);
-    const onProgress = (p: PrewarmProgress) => {
-      if (cancelled) return;
-      if (p.file) setPrewarmFile(p.file);
-      if (p.status === "progress" && typeof p.progress === "number") {
-        setPrewarmProgress(p.progress);
-      }
-      if (p.status === "done" || p.status === "ready") {
-        setPrewarmProgress(100);
-      }
-    };
-    Promise.all([prewarmWhisper(whisperModelId, onProgress), prewarmVad()])
-      .then(() => {
-        if (cancelled) return;
-        setPrewarmStatus("ready");
-        setPrewarmProgress(100);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        console.error("[lobby] prewarm failed", err);
-        setPrewarmStatus("error");
-        setPrewarmError(err instanceof Error ? err.message : "unknown error");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [role, whisperModelId]);
 
   const handleJoin = async () => {
     if (joining) return;
@@ -190,84 +141,78 @@ export function Lobby({ roomId, displayName, role, onJoin, onCancel }: LobbyProp
   };
 
   return (
-    <PreflightShell
-      hero={<Logo size={72} wordmarkSize={44} surface="overlay" />}
-    >
-      <div className={lobbyStyles.stack}>
-        <header className={preflightShell.pageHead}>
-          <p className="mb-1 t-meta uppercase text-sc-accent-700">
-            Ready to join
-          </p>
-          <h1 className="t-h1 text-sc-text">
-            Room <span className="font-mono">{roomId}</span>
-          </h1>
-          <p className="t-body-sm text-sc-text-2">
-            Joining as{" "}
-            <span className="font-medium text-sc-text">{displayName}</span>
-            {" · "}
-            <span className="capitalize">{role}</span> role.
-          </p>
+    <main className="relative flex min-h-dvh justify-center bg-sc-bg px-6 py-12">
+      <div className="flex w-full max-w-[520px] flex-col gap-6">
+        <header className="flex flex-col gap-3">
+          <Logo size={56} wordmarkSize={36} surface="solid" />
+          <div className="flex flex-col gap-1">
+            <p className="t-meta uppercase text-sc-accent-700">Ready to join</p>
+            <h1 className="t-h1 text-sc-text">
+              Room <span className="font-mono">{roomId}</span>
+            </h1>
+            <p className="t-body-sm text-sc-text-2">
+              Joining as <span className="font-medium text-sc-text">{displayName}</span>
+              {" · "}
+              <span className="capitalize">{role}</span> role.
+            </p>
+          </div>
         </header>
 
-        <div className={lobbyStyles.videoSection}>
-          <div className="relative">
-            <div className="sc-tile-placeholder relative aspect-[4/3] w-full overflow-hidden rounded-sc-2xl border border-sc-border shadow-sc-md">
-              <video
-                ref={videoRef}
-                className="absolute inset-0 size-full object-cover"
-                autoPlay
-                playsInline
-                muted
-              />
-              {!camEnabled || !ready ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-sc-text-2">
-                  <VideoCameraSlash size={28} weight="fill" />
-                  <span className="t-body-sm">
-                    {!camEnabled
-                      ? "Camera off"
-                      : error
-                        ? "Preview blocked"
-                        : "Connecting camera…"}
-                  </span>
-                </div>
-              ) : null}
-              <div className="absolute bottom-3 left-3 rounded-sc-full bg-black/55 px-3 py-1 text-[13px] font-medium text-white backdrop-blur">
-                {displayName} · you ({role})
+        <div className="relative">
+          <div className="sc-tile-placeholder relative aspect-[4/3] w-full overflow-hidden rounded-sc-2xl border border-sc-border shadow-sc-md">
+            <video
+              ref={videoRef}
+              className="absolute inset-0 size-full -scale-x-100 object-cover"
+              autoPlay
+              playsInline
+              muted
+            />
+            {!camEnabled || !ready ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-sc-text-2">
+                <VideoCameraSlash size={28} weight="fill" />
+                <span className="t-body-sm">
+                  {!camEnabled
+                    ? "Camera off"
+                    : error
+                      ? "Preview blocked"
+                      : "Connecting camera…"}
+                </span>
               </div>
+            ) : null}
+            <div className="absolute bottom-3 left-3 rounded-sc-full bg-black/55 px-3 py-1 text-[13px] font-medium text-white backdrop-blur">
+              {displayName} · you ({role})
             </div>
+          </div>
 
-            <div className="absolute -bottom-5 left-1/2 z-10 -translate-x-1/2">
-              <div className="flex items-center gap-2 rounded-sc-full border border-sc-border bg-sc-surface p-2 shadow-sc-md">
-                <ToggleControl
-                  label={micEnabled ? "Mute mic" : "Unmute mic"}
-                  onClick={() => setMicEnabled((v) => !v)}
-                  muted={!micEnabled}
-                >
-                  {micEnabled ? (
-                    <Microphone size={18} weight="fill" />
-                  ) : (
-                    <MicrophoneSlash size={18} weight="fill" />
-                  )}
-                </ToggleControl>
-                <ToggleControl
-                  label={camEnabled ? "Turn camera off" : "Turn camera on"}
-                  onClick={() => setCamEnabled((v) => !v)}
-                  muted={!camEnabled}
-                >
-                  {camEnabled ? (
-                    <VideoCamera size={18} weight="fill" />
-                  ) : (
-                    <VideoCameraSlash size={18} weight="fill" />
-                  )}
-                </ToggleControl>
-              </div>
+          <div className="absolute -bottom-5 left-1/2 z-10 -translate-x-1/2">
+            <div className="flex items-center gap-2 rounded-sc-full border border-sc-border bg-sc-surface p-2 shadow-sc-md">
+              <ToggleControl
+                label={micEnabled ? "Mute mic" : "Unmute mic"}
+                onClick={() => setMicEnabled((v) => !v)}
+                muted={!micEnabled}
+              >
+                {micEnabled ? (
+                  <Microphone size={18} weight="fill" />
+                ) : (
+                  <MicrophoneSlash size={18} weight="fill" />
+                )}
+              </ToggleControl>
+              <ToggleControl
+                label={camEnabled ? "Turn camera off" : "Turn camera on"}
+                onClick={() => setCamEnabled((v) => !v)}
+                muted={!camEnabled}
+              >
+                {camEnabled ? (
+                  <VideoCamera size={18} weight="fill" />
+                ) : (
+                  <VideoCameraSlash size={18} weight="fill" />
+                )}
+              </ToggleControl>
             </div>
           </div>
         </div>
 
-        <div className={lobbyStyles.rail} aria-hidden />
-
-        <section className={lobbyStyles.devicesSection}>
+        <section className="mt-4 flex flex-col gap-4 rounded-sc-2xl border border-sc-border bg-sc-surface p-5 shadow-sc-sm">
           <p className="t-meta uppercase text-sc-text-3">Devices</p>
           <DevicePicker
             kind="videoinput"
@@ -295,90 +240,34 @@ export function Lobby({ roomId, displayName, role, onJoin, onCancel }: LobbyProp
         </section>
 
         {role === "deaf" ? (
-          <div className={lobbyStyles.prewarmSlot}>
-            <PrewarmChip
-              status={prewarmStatus}
-              progress={prewarmProgress}
-              file={prewarmFile}
-              error={prewarmError}
-            />
-          </div>
+          <section className="flex flex-col gap-3 rounded-sc-2xl border border-sc-border bg-sc-surface p-5 shadow-sc-sm">
+            <p className="t-body-sm text-sc-text-2">
+              Pick the voice the hearing participant hears when you sign. You
+              can change it later from in-call settings.
+            </p>
+            <VoicePicker />
+          </section>
         ) : null}
 
-        <div className={lobbyStyles.actions}>
-          <button
-            type="button"
-            onClick={() => void handleJoin()}
-            disabled={
-              !ready || joining || (role === "deaf" && prewarmStatus !== "ready")
-            }
-            className="sc-luminous inline-flex h-12 w-full shrink-0 items-center justify-center rounded-sc-full px-6 text-[15px] font-medium transition-[transform,filter] duration-200 hover:-translate-y-px hover:brightness-105 active:translate-y-0 disabled:opacity-40 disabled:pointer-events-none"
-          >
-            {joining ? "Joining…" : "Join now"}
-          </button>
+        <button
+          type="button"
+          onClick={() => void handleJoin()}
+          disabled={!ready || joining}
+          className="sc-luminous mt-2 inline-flex h-12 w-full items-center justify-center rounded-sc-full px-6 text-[15px] font-medium transition-[transform,filter] duration-200 hover:-translate-y-px hover:brightness-105 active:translate-y-0 disabled:opacity-40 disabled:pointer-events-none"
+        >
+          {joining ? "Joining…" : "Join now"}
+        </button>
 
-          <button
-            type="button"
-            onClick={onCancel}
-            className={`inline-flex items-center justify-center gap-2 self-center rounded-sc-md px-3 py-2 t-label text-sc-text-3 transition-colors duration-150 hover:text-sc-text-2 ${lobbyStyles.backBtn}`}
-          >
-            <ArrowLeft size={14} weight="bold" />
-            Back
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="inline-flex items-center justify-center gap-2 self-center rounded-sc-md px-3 py-2 t-label text-sc-text-3 transition-colors duration-150 hover:text-sc-text-2"
+        >
+          <ArrowLeft size={14} weight="bold" />
+          Back
+        </button>
       </div>
-    </PreflightShell>
-  );
-}
-
-interface PrewarmChipProps {
-  status: PrewarmStatus;
-  progress: number;
-  file: string | null;
-  error: string | null;
-}
-
-function PrewarmChip({ status, progress, file, error }: PrewarmChipProps) {
-  if (status === "ready") {
-    return (
-      <div className="inline-flex items-center gap-2 self-center rounded-sc-full bg-sc-success-subtle px-3 py-1.5 t-body-sm text-sc-success">
-        <CheckCircle size={16} weight="fill" />
-        Captions ready
-      </div>
-    );
-  }
-  if (status === "error") {
-    return (
-      <div className="flex flex-col gap-2 rounded-sc-md bg-sc-warning-subtle p-3 text-sc-warning">
-        <div className="flex items-center gap-2 t-body-sm font-medium">
-          <WarningCircle size={16} weight="fill" />
-          Captions failed to load
-        </div>
-        {error ? (
-          <p className="t-body-sm text-sc-text-2">
-            {error}. Reload the page to retry.
-          </p>
-        ) : null}
-      </div>
-    );
-  }
-  return (
-    <div className="flex flex-col gap-2 rounded-sc-md bg-sc-accent-soft p-3 text-sc-accent-700">
-      <div className="flex items-center gap-2 t-body-sm font-medium">
-        <CircleNotch size={16} weight="bold" className="animate-spin" />
-        <span className="flex-1">Preparing captions</span>
-        <span className="font-mono text-[12px]">{Math.round(progress)}%</span>
-      </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-sc-full bg-sc-accent-soft-2">
-        <div
-          className="h-full rounded-sc-full bg-sc-accent-500 transition-[width] duration-200"
-          style={{ width: `${Math.max(2, progress)}%` }}
-        />
-      </div>
-      {file ? (
-        <p className="truncate font-mono text-[11px] text-sc-text-3">{file}</p>
-      ) : null}
-    </div>
+    </main>
   );
 }
 

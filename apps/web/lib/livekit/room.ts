@@ -121,6 +121,8 @@ export function useLiveKitRoom(args: UseLiveKitRoomArgs): LiveKitRoomState {
 
   const roomRef = useRef<Room | null>(null);
   const remoteIdentityRef = useRef<string | null>(null);
+  const remoteVideoSidRef = useRef<string | null>(null);
+  const remoteAudioSidRef = useRef<string | null>(null);
   const [room, setRoom] = useState<Room | null>(null);
   const [localVideoTrack, setLocalVideoTrack] = useState<LocalVideoTrack | null>(
     null,
@@ -190,15 +192,17 @@ export function useLiveKitRoom(args: UseLiveKitRoomArgs): LiveKitRoomState {
       });
       const videoPub = p.getTrackPublication(Track.Source.Camera);
       const audioPub = p.getTrackPublication(Track.Source.Microphone);
-      setRemoteVideoTrack(
-        (videoPub?.videoTrack as RemoteVideoTrack | null) ?? null,
-      );
-      setRemoteAudioTrack(
-        (audioPub?.audioTrack as RemoteAudioTrack | null) ?? null,
-      );
+      const videoTrack = (videoPub?.videoTrack as RemoteVideoTrack | null) ?? null;
+      const audioTrack = (audioPub?.audioTrack as RemoteAudioTrack | null) ?? null;
+      remoteVideoSidRef.current = videoTrack?.sid ?? null;
+      remoteAudioSidRef.current = audioTrack?.sid ?? null;
+      setRemoteVideoTrack(videoTrack);
+      setRemoteAudioTrack(audioTrack);
     };
     const clearRemote = () => {
       remoteIdentityRef.current = null;
+      remoteVideoSidRef.current = null;
+      remoteAudioSidRef.current = null;
       setRemoteIdentity(null);
       setRemoteName(null);
       setRemoteRole(null);
@@ -221,14 +225,32 @@ export function useLiveKitRoom(args: UseLiveKitRoomArgs): LiveKitRoomState {
     ) => {
       remoteIdentityRef.current = participant.identity;
       if (track.kind === Track.Kind.Video) {
+        remoteVideoSidRef.current = track.sid ?? null;
         setRemoteVideoTrack(track as RemoteVideoTrack);
       } else if (track.kind === Track.Kind.Audio) {
+        remoteAudioSidRef.current = track.sid ?? null;
         setRemoteAudioTrack(track as RemoteAudioTrack);
       }
     };
+    // Only clear state when the unsubscribed track is the one currently held.
+    // When the deaf side swaps mic -> signchat-voice, livekit fires
+    // TrackSubscribed(new) followed by TrackUnsubscribed(old) on the same
+    // participant; without the sid guard the unsubscribe would null the
+    // freshly-subscribed track and the hearing user would hear silence.
     const onTrackUnsubscribed = (track: RemoteTrack) => {
-      if (track.kind === Track.Kind.Video) setRemoteVideoTrack(null);
-      else if (track.kind === Track.Kind.Audio) setRemoteAudioTrack(null);
+      if (
+        track.kind === Track.Kind.Video &&
+        track.sid === remoteVideoSidRef.current
+      ) {
+        remoteVideoSidRef.current = null;
+        setRemoteVideoTrack(null);
+      } else if (
+        track.kind === Track.Kind.Audio &&
+        track.sid === remoteAudioSidRef.current
+      ) {
+        remoteAudioSidRef.current = null;
+        setRemoteAudioTrack(null);
+      }
     };
     const onLocalTrackPublished = () => refreshLocalTracks();
     const onLocalTrackUnpublished = () => refreshLocalTracks();
@@ -302,6 +324,8 @@ export function useLiveKitRoom(args: UseLiveKitRoomArgs): LiveKitRoomState {
       void r.disconnect(true);
       roomRef.current = null;
       remoteIdentityRef.current = null;
+      remoteVideoSidRef.current = null;
+      remoteAudioSidRef.current = null;
       setRoom(null);
       setLocalVideoTrack(null);
       setLocalAudioTrack(null);

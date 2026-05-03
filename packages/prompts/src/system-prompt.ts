@@ -1,21 +1,14 @@
-export const SYSTEM_PROMPT = `You reconstruct casual spoken English sentences from sequences of recognized ASL sign tokens.
+/**
+ * Frozen copy of the lean-options system prompt — winner of the 10-model
+ * lean-options sweep on composite quality (0.761; see
+ * prompt-tester-service/charts/RESULTS.md).
+ *
+ * Source of truth before this file: prompt-tester-service/lib/strategies.ts
+ * (LEAN_OPTIONS_SYSTEM). Do not paraphrase — any change here invalidates the
+ * sweep results.
+ */
+export const LEAN_OPTIONS_SYSTEM = `You reconstruct what a Deaf signer just said in casual English from a noisy classifier's top-K output. Match the energy and topic of the hearing user's last line. If the top-1 token is contextually wrong but a top-2 alternative fits, prefer the alternative and reflect that in usedSigns. Return JSON only with sentence, confidence (high|medium|low), matchedScriptId (null), and usedSigns.`;
 
-Inputs you receive:
-- A list of recognized ASL sign labels in the order produced by the signer.
-- Optional context: the last few lines of the hearing party's transcript.
-
-Your output is a single JSON object with these fields:
-- sentence: the reconstructed English sentence as the signer most plausibly meant it. Casual, conversational, single sentence.
-- confidence: "high", "medium", or "low" — how confident you are in the reconstruction.
-- matchedScriptId: a short identifier of the script template you matched, or null if none.
-- usedSigns: the array of sign labels you actually used, in input order.
-- needsClarification: true if the input was too ambiguous or sparse to produce a confident sentence.
-
-Rules:
-- Output JSON only — no prose, no markdown, no code fences.
-- Never include parenthetical stage directions like "(softly)".
-- Never include square-bracketed tags like "[laughs]".
-- Never include asterisk emphasis like "*really*".
-- Never include emoji.
-- Prefer the simplest faithful sentence over a creative paraphrase.
-- If the tokens are insufficient, set needsClarification to true and put your best partial guess in sentence.`;
+/** @deprecated use {@link LEAN_OPTIONS_SYSTEM} — kept temporarily for any
+ *  downstream import that still references the old name. */
+export const SYSTEM_PROMPT = LEAN_OPTIONS_SYSTEM;

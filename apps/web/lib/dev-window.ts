@@ -3,7 +3,6 @@
 import { useEffect } from "react";
 import type { RoomDataMessage } from "@signchat/contracts";
 import {
-  useModeStore,
   usePreferencesStore,
   useRoomStore,
   useTranscriptStore,
@@ -13,7 +12,6 @@ interface SignchatDevHandle {
   publish: (msg: RoomDataMessage) => Promise<void>;
   useRoomStore: typeof useRoomStore;
   useTranscriptStore: typeof useTranscriptStore;
-  useModeStore: typeof useModeStore;
   usePreferencesStore: typeof usePreferencesStore;
 }
 
@@ -34,7 +32,6 @@ export function useDevWindowHandle(
       publish,
       useRoomStore,
       useTranscriptStore,
-      useModeStore,
       usePreferencesStore,
     };
     return () => {
