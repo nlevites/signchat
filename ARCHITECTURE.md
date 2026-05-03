@@ -186,6 +186,7 @@ Workspace tooling: `pnpm` with workspace protocol, `pnpm -w typecheck && pnpm -w
 ### 5.8 Speech-to-text — Whisper, on the Deaf machine only
 
 - **Where it runs.** Browser main thread on the Deaf user's machine. The Hearing browser does not run STT. The Deaf side subscribes to the Hearing user's `RemoteAudioTrack` via livekit-client, pipes the decoded audio into a Web Audio `AudioWorkletNode` that buffers Float32 PCM frames at 16 kHz mono, and routes them through Silero VAD into Whisper.
+- **Library.** `@huggingface/transformers@3.0.2`, **CDN-loaded** from `https://esm.sh` via the same `new Function('u', 'return import(u)')` shim as onnxruntime-web (§5.4). Not in `package.json`. Picks WebGPU + `dtype: "fp32"` when available, falls back to WASM + `dtype: "q8"`. Silero VAD blob fetched from `https://huggingface.co/onnx-community/silero-vad/resolve/main/onnx/model.onnx`.
 - **Streaming strategy.** A small Silero VAD (~1 MB ONNX) inspects each ~30 ms PCM frame and emits speech-start / speech-end events. Whisper inference runs on the closed utterance plus, while speech is ongoing, on a 1-second rolling window for early-partial captions. p50 partial latency is `utterance-length + ~300 ms`. Silence is never transcribed.
 - **Model dropdown** (in Debug view, persists to `localStorage` as `signchat:whisper-model-id`):
   - `Xenova/whisper-tiny.en` — ~40 MB, lowest quality, fastest cold start.
