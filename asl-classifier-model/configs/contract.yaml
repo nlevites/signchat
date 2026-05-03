@@ -1,0 +1,41 @@
+# Inference-time contract layer config. Read by src/realtime_demo.py to
+# instantiate src.contract.ContractStateMachine and apply temperature scaling
+# from the checkpoint's temperature.json (if present).
+#
+# These knobs DO NOT affect the trained model weights; tune them per camera
+# / signer / venue without retraining.
+#
+# How the demo uses each field:
+#   contract.k                 -> top_k width in each emitted TickEvent
+#   contract.oov_gate          -> max_prob below this -> low_conf flag
+#   contract.stability_k       -> consecutive agreeing windows -> stable
+#   contract.release_frames    -> N consecutive idle/low-conf to release
+#                                 the suppressed word and allow re-commit
+#   contract.release_prob      -> max_prob below this counts as a release tick
+#   contract.inference_every   -> run the model every N webcam frames
+#                                 (GPU local: 2; M-series Metal: 8)
+#   contract.buffer_frames     -> rolling window length passed to model
+#   contract.motion_idle_thresh-> below this hand-velocity -> idle short-circuit
+#                                 (skip model call entirely; emit idle TickEvent)
+#   contract.motion_window     -> trailing frames included in motion energy
+#   calibration.apply          -> if true, divide logits by T (from
+#                                 temperature.json next to the checkpoint)
+#                                 before softmax. Honest probabilities for the
+#                                 LLM consumer; argmax/top-1 unchanged.
+#   calibration.fallback_T     -> T to use when no temperature.json is present
+#                                 (1.0 = no scaling; identity passthrough)
+
+contract:
+  k: 3
+  oov_gate: 0.4
+  stability_k: 3
+  release_frames: 5
+  release_prob: 0.3
+  inference_every: 2
+  buffer_frames: 64
+  motion_idle_thresh: 0.05
+  motion_window: 30
+
+calibration:
+  apply: true
+  fallback_T: 1.0

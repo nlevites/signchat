@@ -1,0 +1,31 @@
+# TensorFlow 2.15.1: supports CUDA 12.2 (works on H100 / A100 / 4090); fixes the
+# silent CosineDecay(warmup_target=...) no-op present in 2.14; still uses Keras 2
+# by default so no model.save / load_weights API changes needed.
+# On Linux, install the [and-cuda] extra so the bundled CUDA libs are pulled in.
+# On macOS (M4), install the plain wheel; for Metal GPU swap to
+# `tensorflow-macos==2.15.0` + `tensorflow-metal==1.1.0`.
+tensorflow[and-cuda]==2.15.1; sys_platform == "linux"
+tensorflow==2.15.1; sys_platform != "linux"
+tensorflow-hub==0.15.0
+
+# MediaPipe Holistic (legacy solutions API; the Tasks API does not yet expose Holistic).
+mediapipe==0.10.9
+
+# Webcam + video I/O
+opencv-python==4.9.0.80
+
+# Data wrangling
+numpy==1.26.4
+pandas==2.2.0
+pyyaml==6.0.1
+scikit-learn==1.4.0
+tqdm==4.66.1
+
+# WLASL data
+kagglehub==0.3.6          # downloads pre-extracted MuteMotion landmarks (primary path; >=0.3.0 has dataset_download)
+requests==2.31.0
+yt-dlp==2024.3.10         # fallback for the DIY YouTube + MediaPipe extraction path
+
+# Cloud automation (M4 local only; harmless on the pod)
+runpod==1.6.2             # RunPod Python SDK (used by scripts/runpod_train.py)
+python-dotenv==1.0.1      # loads .env into os.environ
