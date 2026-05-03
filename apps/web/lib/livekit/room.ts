@@ -29,9 +29,12 @@ import {
 } from "@/lib/livekit/data-channel";
 import {
   type ConnectionState as RoomConnectionState,
+  useDebugSignalsStore,
   useRoomStore,
   useTranscriptStore,
 } from "@/lib/stores";
+import type { ClassifierResult } from "@signchat/runtime-browser/sign-pipeline/classifier";
+import type { VisionFrame } from "@signchat/runtime-browser/sign-pipeline/mediapipe-runner";
 import { toast } from "@/lib/stores/toast";
 
 export interface UseLiveKitRoomArgs {
@@ -67,6 +70,16 @@ function dispatchRoomDataMessage(
   msg: RoomDataMessage,
   _from: ParticipantInfo,
 ): void {
+  if (msg.kind === "debug_signals") {
+    // remote-published debug snapshot from the deaf side. cast back to the
+    // shapes the contract opaqued — sender and receiver are both browsers
+    // running the same runtime-browser package so the structural shape
+    // matches even though the contract types it as `unknown`.
+    const debug = useDebugSignalsStore.getState();
+    debug.setLatestFrame((msg.frame as VisionFrame | null) ?? null);
+    debug.setLatestResult((msg.result as ClassifierResult | null) ?? null);
+    return;
+  }
   const t = useTranscriptStore.getState();
   if (msg.kind === "transcript_partial") {
     t.upsertPartial(msg.id, { from: msg.from, text: msg.text, ts: msg.ts });

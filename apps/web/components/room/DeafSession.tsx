@@ -25,6 +25,8 @@ import {
   useModeSnapshot,
 } from "@signchat/runtime-browser/mode-controller/controller-store";
 import type { ModeController } from "@signchat/runtime-browser/mode-controller/mode-controller";
+import type { ClassifierResult } from "@signchat/runtime-browser/sign-pipeline/classifier";
+import type { VisionFrame } from "@signchat/runtime-browser/sign-pipeline/mediapipe-runner";
 import { MediaPipeOnnxClassifier } from "@signchat/runtime-browser/sign-pipeline/mediapipe-onnx-classifier";
 import { reconstruct } from "@signchat/runtime-browser/openrouter/client";
 import {
@@ -212,15 +214,49 @@ export function DeafSession({
     const stream = new MediaStream([mst]);
     const debugStore = useDebugSignalsStore.getState();
     debugStore.setCameraStream(stream);
+
+    /* Debug-signals broadcast — re-publish the latest frame + result as a
+     * lossy data-channel message so the hearing peer can render the same
+     * mediapipe overlay in their debug view. throttle to ~6 fps so we
+     * don't saturate the data channel; mediapipe runs at 30 fps and we
+     * only need a smooth-enough overlay. */
+    let lastPublishMs = 0;
+    let pendingFrameRef: VisionFrame | null = null;
+    let pendingResultRef: ClassifierResult | null = null;
+    const PUBLISH_INTERVAL_MS = 150;
+    const flushDebugPublish = () => {
+      const now = Date.now();
+      if (now - lastPublishMs < PUBLISH_INTERVAL_MS) return;
+      lastPublishMs = now;
+      const msg: RoomDataMessage = {
+        v: 1,
+        kind: "debug_signals",
+        id: `dbg-${now}`,
+        ts: now,
+        from: participantInfo,
+        frame: pendingFrameRef,
+        result: pendingResultRef,
+      };
+      void publishRef.current(msg).catch(() => {
+        // unreliable channel — silent drops are fine
+      });
+    };
+
     const cls = new MediaPipeOnnxClassifier({
       config: { inferenceIntervalMs: prefs.thresholds.intervalMs },
       stream,
       blockedLabels: BLOCKED_SIGN_LABELS,
-      onFrame: (frame) => useDebugSignalsStore.getState().setLatestFrame(frame),
+      onFrame: (frame) => {
+        useDebugSignalsStore.getState().setLatestFrame(frame);
+        pendingFrameRef = frame;
+        flushDebugPublish();
+      },
     });
     const offResult = cls.onResult((result) => {
       controllerRef.current?.ingest(result);
       useDebugSignalsStore.getState().setLatestResult(result);
+      pendingResultRef = result;
+      flushDebugPublish();
     });
     const offState = cls.onStateChange((state, err) => {
       if (err) {

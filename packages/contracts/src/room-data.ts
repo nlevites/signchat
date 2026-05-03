@@ -42,11 +42,27 @@ export interface TranscriptFinalMessage {
   text: string;
 }
 
+/* Debug-only frame snapshot from the deaf-side mediapipe + classifier
+ * pipeline. lossy/unreliable: the receiver only renders the latest frame,
+ * dropped frames are fine. opaque JSON so the contract package doesn't
+ * need to depend on @signchat/runtime-browser types — both ends already
+ * know the VisionFrame / ClassifierResult shapes. */
+export interface DebugSignalsMessage {
+  v: 1;
+  kind: "debug_signals";
+  id: string;
+  ts: number;
+  from: ParticipantInfo;
+  frame: unknown;
+  result: unknown;
+}
+
 export type RoomDataMessage =
   | ChatMessage
   | CaptionMessage
   | TranscriptPartialMessage
-  | TranscriptFinalMessage;
+  | TranscriptFinalMessage
+  | DebugSignalsMessage;
 
 export type RoomDataMessageKind = RoomDataMessage["kind"];
 
@@ -55,6 +71,7 @@ const ROOM_DATA_KINDS: ReadonlySet<RoomDataMessageKind> = new Set([
   "caption",
   "transcript_partial",
   "transcript_final",
+  "debug_signals",
 ]);
 
 // reliability per kind, per architecture §11.4. encoded as a const map so the
@@ -65,6 +82,7 @@ export const RELIABILITY_BY_KIND: Record<RoomDataMessageKind, boolean> = {
   caption: true,
   transcript_partial: false,
   transcript_final: true,
+  debug_signals: false,
 };
 
 export function isRoomDataMessage(x: unknown): x is RoomDataMessage {
@@ -95,6 +113,10 @@ export function isRoomDataMessage(x: unknown): x is RoomDataMessage {
         typeof m.latencyMs === "number" &&
         Number.isFinite(m.latencyMs)
       );
+    case "debug_signals":
+      // frame/result are opaque to the contract — receiver casts back to
+      // the runtime-browser shapes it already knows. presence is enough.
+      return "frame" in m && "result" in m;
     default:
       return false;
   }
