@@ -1,49 +1,20 @@
-# Google Kaggle ISLR (asl-signs / PopSign) FULL training run -- the primary
-# recipe this repo trains against.
+# PopSign 250 (asl-signs / Google ISLR) full training run.
 #
-# Sibling of pretrain_phase1_kaggle_smoke.yaml tuned for full convergence
-# rather than a 2-epoch drift gate. PopSign 250 has high per-class density
-# (~378 clips/class) and architecture viability is proven (the smoke variant
-# hit val_acc 0.106 at epoch 2).
+# Inherits the hoyso48 1st-place recipe from base.yaml. Overrides only the
+# experiment name and confirms the cache + splits paths.
 #
-# All four asl-signs Kaggle 1st/2nd-place winner playbook elements are
-# inherited from base.yaml:
-#   * smaller model (dim=192, n_blocks=6, n_heads=6 -> ~5-8M params)
-#   * shorter sequences (max_len=160; not 384)
-#   * acceleration channels (n_channels=9 = xyz + delta + accel)
-#   * CutMix augmentation (alpha=0.3, prob=1.0)
-#
-# Training-pipeline path:
-#   * Single cache_dir (kaggle_islr only) so the multi-source balanced
-#     sampling code path falls through to single-source -- the proven
-#     kaggle_smoke pipeline shape.
-#   * vocab: auto over a single dir resolves to Kaggle's native 250-class
-#     vocab.json -- no union dilution.
-#
-# Decision gate (run a 6-epoch smoke first via --epochs 6):
-#   val_acc >= 0.40 by epoch 6 -> proceed to full 30-epoch run
-#   val_acc 0.20-0.40          -> investigate (try lr 3e-4 or extend epochs)
-#   val_acc <  0.20            -> regression vs the 0.106 kaggle_smoke
-#                                  baseline; debug before more spend
+# Cost: ~$16 on a RunPod H200 (~4 hr at 300 epochs). Override --epochs 5 for
+# a $1 smoke that validates the port end-to-end.
 
 extends: base.yaml
 
 experiment:
-  name: phase1_kaggle             # routes to pretrained/phase1_kaggle/
-  kind: pretrain
-  notes: "Kaggle ISLR (PopSign) full: 250 classes, ~5-8M params, n_ch=9, max_len=160, CutMix"
+  name: phase1_kaggle
+  kind: pretrain                  # routes to pretrained/phase1_kaggle/
+  notes: "hoyso48 port: 250 PopSign signs, dim=192, 300 epochs, AWP+LateDropout"
 
 data:
   cache_dir:
-    - data/cache/kaggle_islr      # only source on purpose (vs broad's 4-cache union)
-  vocab: auto                     # resolves to kaggle's native 250-class vocab.json
+    - data/cache/kaggle_islr
+  vocab: auto
   splits_path: data/splits/kaggle_islr.json
-  use_smoke: false
-
-train:
-  batch_size: 256
-  epochs: 30                      # vs kaggle_smoke=2; can override via --epochs
-  lr: 5e-4                        # matches kaggle_smoke (proven to converge)
-  warmup_epochs: 2                # vs smoke=1; smoother ramp over more total epochs
-  schedule: cosine
-  early_stop_patience: 8          # vs smoke=99; do early-stop once converged

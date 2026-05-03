@@ -1,0 +1,20 @@
+.DS_Store
+node_modules/
+.next/
+.env
+.env.*
+!.env.example
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Runtime artifacts (regenerated; never committed)
+data/cache/
+pretrained/
+checkpoints/
+pod_session.log
+_logs/

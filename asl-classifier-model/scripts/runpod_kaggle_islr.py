@@ -94,6 +94,14 @@ def main():
                              "size up via REST PATCH if you'll co-locate other datasets.")
     parser.add_argument("--vcpu", type=int, default=16,
                         help="CPU pod vCPU count (default 16; 8 workers is enough)")
+    parser.add_argument("--cpu-flavor", default=None,
+                        help="CPU flavor id (default falls back through "
+                             "['cpu5c', 'cpu3c', 'cpu5g'] until one is available; "
+                             "cpu5c is fastest, cpu3c is most-available)")
+    parser.add_argument("--cloud-type", default=None,
+                        choices=("SECURE", "COMMUNITY"),
+                        help="cloud tier (default: try SECURE then COMMUNITY). "
+                             "COMMUNITY tends to have more CPU availability.")
     parser.add_argument("--workers", type=int, default=8,
                         help="parquet->npy conversion workers (default 8)")
     parser.add_argument("--cache-on-volume",
@@ -112,6 +120,12 @@ def main():
                              "or a runaway extraction.")
     parser.add_argument("--tag", default="kaggle-islr",
                         help="pod/volume name tag (default 'kaggle-islr')")
+    parser.add_argument("--gpu", default=None,
+                        help="Provision a GPU pod (this exact gpu_type_id) "
+                             "instead of CPU. Use as a fallback when CPU + "
+                             "volume capacity is depleted globally; e.g. "
+                             "'NVIDIA H200'. The GPU is unused for the "
+                             "extract itself - it's just an expensive CPU box.")
     args = parser.parse_args()
 
     creds = load_credentials()
@@ -137,21 +151,82 @@ def main():
         signal.signal(sig, lambda *_: (_cleanup(), sys.exit(130)))
 
     try:
-        print(f"[kaggle-islr] provisioning {args.vcpu} vCPU pod...")
-        pod_resp = rest.create_cpu_pod(
-            name=f"signchat-{args.tag}",
-            vcpu=args.vcpu,
-            image=CPU_POD_IMAGE,
-            cpu_flavor=DEFAULT_CPU_FLAVOR,
-            network_volume_id=volume_id,
-            env={
-                "PUBLIC_KEY": ephemeral.public_text,
-                "KAGGLE_USERNAME": creds.kaggle_user,
-                "KAGGLE_KEY": creds.kaggle_key,
-            },
-            container_disk_gb=50,
-            data_center_ids=[dc_id] if dc_id else None,
-        )
+        if args.gpu:
+            # GPU pod fallback: use when CPU+volume capacity is depleted
+            # globally (RunPod periodically goes to zero CPU availability for
+            # volume-attached pods). The GPU is unused for the extract; we
+            # just need a box that can mount the volume.
+            import runpod as _rp
+            _rp.api_key = creds.runpod_key
+            print(f"[kaggle-islr] provisioning GPU pod ({args.gpu})...")
+            pod_resp = _rp.create_pod(
+                name=f"signchat-{args.tag}",
+                image_name=CPU_POD_IMAGE,
+                gpu_type_id=args.gpu,
+                cloud_type="SECURE",
+                gpu_count=1,
+                container_disk_in_gb=50,
+                volume_in_gb=0,
+                support_public_ip=True,
+                start_ssh=True,
+                ports="22/tcp",
+                env={
+                    "PUBLIC_KEY": ephemeral.public_text,
+                    "KAGGLE_USERNAME": creds.kaggle_user,
+                    "KAGGLE_KEY": creds.kaggle_key,
+                },
+                network_volume_id=volume_id,
+                volume_mount_path="/workspace",
+            )
+        else:
+            # Try the user-specified flavor + cloud first, then fall back. RunPod
+            # CPU capacity per-DC + cloudType fluctuates; cpu5c (5GHz) is
+            # preferred for IO-bound parquet->npy conversion but smaller cpu3c
+            # is more reliably available; COMMUNITY tier tends to have more
+            # capacity than SECURE.
+            flavor_candidates = (
+                [args.cpu_flavor] if args.cpu_flavor else ["cpu5c", "cpu3c", "cpu5g"]
+            )
+            cloud_candidates = (
+                [args.cloud_type] if args.cloud_type else ["SECURE", "COMMUNITY"]
+            )
+            pod_resp = None
+            last_err: Exception | None = None
+            for cloud in cloud_candidates:
+                for flavor in flavor_candidates:
+                    print(f"[kaggle-islr] provisioning {args.vcpu} vCPU pod "
+                          f"({flavor}, {cloud})...")
+                    try:
+                        # cpu3c-4 caps container disk at 40 GB; the asl-signs dataset
+                        # lives on the network volume not the container disk, so 40 GB
+                        # is plenty for OS + apt + a small kagglehub temp cache.
+                        pod_resp = rest.create_cpu_pod(
+                            name=f"signchat-{args.tag}",
+                            vcpu=args.vcpu,
+                            image=CPU_POD_IMAGE,
+                            cpu_flavor=flavor,
+                            network_volume_id=volume_id,
+                            env={
+                                "PUBLIC_KEY": ephemeral.public_text,
+                                "KAGGLE_USERNAME": creds.kaggle_user,
+                                "KAGGLE_KEY": creds.kaggle_key,
+                            },
+                            container_disk_gb=40,
+                            data_center_ids=[dc_id] if dc_id else None,
+                            cloud_type=cloud,
+                        )
+                        break
+                    except Exception as e:
+                        print(f"[kaggle-islr] {flavor}/{cloud} failed: {e}")
+                        last_err = e
+                if pod_resp is not None:
+                    break
+            if pod_resp is None:
+                raise RuntimeError(
+                    f"could not provision CPU pod across "
+                    f"flavors={flavor_candidates} clouds={cloud_candidates}. "
+                    f"Last error: {last_err}"
+                )
         pod_id = pod_resp["id"]
         print(f"[kaggle-islr] pod_id={pod_id}")
         host, port = wait_for_pod_ready(rest, pod_id, timeout_s=480)
@@ -165,7 +240,7 @@ def main():
                 raise TimeoutError(
                     f"wall-clock budget ({args.wall_timeout_min} min) exceeded")
 
-        # 1. Install dependencies
+        # 1. Install dependencies (rsync first so step 2 can rsync the repo up).
         print("[kaggle-islr] installing tmux, rsync, kagglehub, pandas, pyarrow...")
         ssh.run(
             "apt-get update -q >/dev/null 2>&1 && "
@@ -175,13 +250,18 @@ def main():
         )
         _check_wall()
 
-        # 2. Clone repo so loader is available on pod
-        print("[kaggle-islr] cloning repo for loader access...")
-        ssh.run(
-            "cd /workspace && "
-            "(test -d SignChatModel && cd SignChatModel && git pull -q) || "
-            "git clone -q https://github.com/nlevites/signchat-model.git SignChatModel",
-            on_line=lambda line: print(line, end=""),
+        # 2. Rsync the local repo up so the loader module is available.
+        # We previously git-cloned from github.com/nlevites/signchat-model which
+        # 404s; rsync-up is the same primitive runpod_train.py uses and is
+        # deterministic regardless of remote-repo state.
+        print("[kaggle-islr] rsync'ing repo up to /workspace/SignChatModel/...")
+        ssh.rsync_up(
+            local="./",
+            remote="/workspace/SignChatModel/",
+            excludes=[".git", ".venv", "venv", "__pycache__",
+                      "data/cache/", "data/raw/", "pretrained/",
+                      "checkpoints/", "pod_session.log",
+                      ".env", "kaggle.json"],
         )
         _check_wall()
 

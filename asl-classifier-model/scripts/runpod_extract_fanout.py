@@ -160,13 +160,14 @@ class RunpodREST:
                        cpu_flavor: str, network_volume_id: str,
                        env: dict, container_disk_gb: int = 50,
                        ports: list[str] = ("22/tcp",),
-                       data_center_ids: Optional[list[str]] = None) -> dict:
+                       data_center_ids: Optional[list[str]] = None,
+                       cloud_type: str = "SECURE") -> dict:
         # `vcpuCount` sets the count; `cpuFlavorIds` is the family. Together
         # they pick a flavor + size like "cpu5c at 32 vCPU".
         body: dict[str, Any] = {
             "name": name,
             "computeType": "CPU",
-            "cloudType": "SECURE",
+            "cloudType": cloud_type,
             "cpuFlavorIds": [cpu_flavor],
             "cpuFlavorPriority": "availability",
             "vcpuCount": vcpu,
@@ -226,7 +227,7 @@ def get_or_create_volume(rest: RunpodREST, volume_id: Optional[str],
         print(f"[volume] reusing {volume_id} in {vol.get('dataCenterId')} "
               f"({vol.get('size')} GB)")
         return vol
-    name = f"signchat-asl-citizen-{tag}"
+    name = f"signchat-{tag}"
     last_err: Optional[Exception] = None
     for dc in dc_preferred:
         try:
