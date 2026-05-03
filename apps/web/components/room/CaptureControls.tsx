@@ -10,7 +10,11 @@ export interface CaptureControlsProps {
   state: ModeState;
   buffer: SignBuffer;
   silenceMs: number;
-  enteredStateAt: number;
+  /**
+   * Wall-clock ms when the current sub-autoStopThreshold streak began.
+   * Null when not in a streak; the silence countdown chip is hidden.
+   */
+  lowConfidenceStartedAt: number | null;
   canStart: boolean;
   onSetMode: (mode: CaptureMode) => void;
   onStart: () => void;
@@ -29,7 +33,7 @@ export function CaptureControls({
   state,
   buffer,
   silenceMs,
-  enteredStateAt,
+  lowConfidenceStartedAt,
   canStart,
   onSetMode,
   onStart,
@@ -40,18 +44,19 @@ export function CaptureControls({
   // Tick at 4Hz only while the auto silence countdown is on-screen so
   // we never call Date.now() during render (React compiler purity).
   const [nowMs, setNowMs] = useState(0);
+  const isAutoCapturing = state === "capturing" && mode === "auto";
+  const showCountdown = isAutoCapturing && lowConfidenceStartedAt !== null;
   useEffect(() => {
-    if (state !== "capturing" || mode !== "auto") return;
+    if (!showCountdown) return;
     setNowMs(Date.now());
     const id = setInterval(() => setNowMs(Date.now()), 250);
     return () => clearInterval(id);
-  }, [state, mode]);
+  }, [showCountdown]);
 
   const isManualCapturing = state === "capturing" && mode === "manual";
-  const isAutoCapturing = state === "capturing" && mode === "auto";
   const silenceWaitMs =
-    isAutoCapturing && nowMs > 0
-      ? Math.max(0, silenceMs - (nowMs - enteredStateAt))
+    showCountdown && lowConfidenceStartedAt !== null && nowMs > 0
+      ? Math.max(0, silenceMs - (nowMs - lowConfidenceStartedAt))
       : null;
 
   return (
@@ -71,25 +76,26 @@ export function CaptureControls({
       ) : null}
 
       {isManualCapturing ? (
-        <>
-          <button
-            type="button"
-            onClick={onStopManual}
-            disabled={buffer.tokens.length === 0}
-            className="sc-luminous inline-flex h-9 items-center gap-1.5 rounded-sc-full px-4 t-label transition-[transform,filter] duration-200 hover:-translate-y-px hover:brightness-105 active:translate-y-0 disabled:pointer-events-none disabled:opacity-40"
-          >
-            <Stop size={14} weight="fill" />
-            Stop
-          </button>
-          <button
-            type="button"
-            onClick={onCancel}
-            className="inline-flex h-9 items-center gap-1.5 rounded-sc-full border border-sc-border bg-sc-surface px-4 t-label text-sc-text transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-sc-border-strong hover:shadow-sc-sm"
-          >
-            <X size={14} weight="bold" />
-            Cancel
-          </button>
-        </>
+        <button
+          type="button"
+          onClick={onStopManual}
+          disabled={buffer.tokens.length === 0}
+          className="sc-luminous inline-flex h-9 items-center gap-1.5 rounded-sc-full px-4 t-label transition-[transform,filter] duration-200 hover:-translate-y-px hover:brightness-105 active:translate-y-0 disabled:pointer-events-none disabled:opacity-40"
+        >
+          <Stop size={14} weight="fill" />
+          Stop
+        </button>
+      ) : null}
+
+      {state === "capturing" ? (
+        <button
+          type="button"
+          onClick={onCancel}
+          className="inline-flex h-9 items-center gap-1.5 rounded-sc-full border border-sc-border bg-sc-surface px-4 t-label text-sc-text transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-sc-border-strong hover:shadow-sc-sm"
+        >
+          <X size={14} weight="bold" />
+          Cancel
+        </button>
       ) : null}
 
       {silenceWaitMs !== null ? (

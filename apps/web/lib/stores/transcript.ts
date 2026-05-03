@@ -11,10 +11,11 @@ interface TranscriptState {
   messages: RoomDataMessage[];
   partialsByUtterance: Record<string, PartialEntry>;
   /**
-   * True when the Deaf-side Whisper streaming loop has detected sustained
-   * partial-inference latency above ARCHITECTURE.md §5.8's 1.5 s threshold
-   * (rolling p50 over the last 3 utterances). UI surfaces this as a
-   * `captions: degraded` chip on the Hearing tile.
+   * True when the Deaf-side STT streaming loop has detected sustained
+   * partial latency above the §5.8 1.5 s threshold. UI surfaces this as a
+   * `captions: degraded` chip on the Hearing tile. Currently always
+   * false with cloud STT; left in place for future server-side latency
+   * telemetry derived from `stt.first-partial`.
    */
   captionsDegraded: boolean;
   appendMessage: (msg: RoomDataMessage) => void;

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import {
   AudioPresets,
+  type LocalAudioTrack,
   type LocalTrackPublication,
   type LocalVideoTrack,
   type RemoteAudioTrack,
@@ -15,6 +16,7 @@ import type {
   RoomDataMessage,
 } from "@signchat/contracts";
 import {
+  buildReconstructionRequest,
   ReconstructionParseError,
   type ReconstructionModelId,
 } from "@signchat/prompts";
@@ -30,8 +32,13 @@ import {
   type VoiceMixer,
 } from "@/lib/audio/voice-mixer";
 import { openTurnWss, speak } from "@/lib/elevenlabs/streaming";
+import {
+  createSttStream,
+  type SttStream,
+} from "@/lib/elevenlabs/stt-streaming";
 import { broadcastCaption } from "@/lib/livekit/caption-broadcast";
 import { mintElevenLabsSignedUrl } from "@/lib/livekit/mint-elevenlabs";
+import { mintElevenLabsSttSignedUrl } from "@/lib/livekit/mint-elevenlabs-stt";
 import { mark, newTurnId } from "@/lib/diagnostics/latency-markers";
 import { LogBus } from "@/lib/diagnostics/log-bus";
 import { useCredentialsStore } from "@/lib/credentials/store";
@@ -43,10 +50,6 @@ import {
   useTranscriptStore,
 } from "@/lib/stores";
 import { toast } from "@/lib/stores/toast";
-import {
-  createWhisperStream,
-  type WhisperStream,
-} from "@/lib/whisper/streaming";
 import { TokenChipStrip } from "@/components/room/TokenChipStrip";
 import { InlinePreview } from "@/components/room/InlinePreview";
 
@@ -67,11 +70,6 @@ import { InlinePreview } from "@/components/room/InlinePreview";
  */
 
 const REMINT_THRESHOLD_MS = 30_000;
-const MIC_CONSTRAINTS: MediaTrackConstraints = {
-  echoCancellation: true,
-  noiseSuppression: true,
-  autoGainControl: true,
-};
 
 export interface DeafSessionProps {
   room: Room | null;
@@ -105,7 +103,7 @@ export function DeafSession({
   const classifierRef = useRef<MediaPipeOnnxClassifier | null>(null);
   const mixerRef = useRef<VoiceMixer | null>(null);
   const mixedPubRef = useRef<LocalTrackPublication | null>(null);
-  const whisperStreamRef = useRef<WhisperStream | null>(null);
+  const sttStreamRef = useRef<SttStream | null>(null);
   const stitchEpochRef = useRef<number>(-1);
   const speakEpochRef = useRef<number>(-1);
   const wasSpeakingWhenHiddenRef = useRef<boolean>(false);
@@ -123,7 +121,7 @@ export function DeafSession({
   // re-run every time the parent rebinds the callback.
   const transcriptCtxRef = useRef(hearingTranscriptContext);
   transcriptCtxRef.current = hearingTranscriptContext;
-  // Latch publish so the whisper-stream effect doesn't tear down when the
+  // Latch publish so the stt-stream effect doesn't tear down when the
   // parent rebinds the callback.
   const publishRef = useRef(publish);
   publishRef.current = publish;
@@ -184,6 +182,8 @@ export function DeafSession({
       top2Threshold: prefs.thresholds.top2Threshold,
       silenceMs: prefs.thresholds.silenceMs,
       inferenceIntervalMs: prefs.thresholds.intervalMs,
+      autoStartThreshold: prefs.thresholds.autoStartThreshold ?? 0.25,
+      autoStopThreshold: prefs.thresholds.autoStopThreshold ?? 0.03,
     });
   }, [prefs.thresholds]);
 
@@ -234,30 +234,71 @@ export function DeafSession({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localVideoTrack]);
 
-  // ----- whisper streaming on the Hearing user's audio track -----------------
+  // ----- elevenlabs STT streaming on the Hearing user's audio track ----------
 
   useEffect(() => {
+    LogBus.info("stt", "effect entered", {
+      hasTrack: !!remoteAudioTrack,
+      remoteRole: remoteParticipant?.role ?? null,
+      remoteIdentity: remoteParticipant?.identity ?? null,
+    });
     if (!remoteAudioTrack) return;
     if (remoteParticipant?.role !== "hearing") return;
     const speaker = remoteParticipant;
-    const stream = createWhisperStream({
-      modelId: prefs.whisperModelId,
-      remoteAudioTrack,
-      speaker,
-      publish: (msg) => publishRef.current(msg),
-    });
-    whisperStreamRef.current = stream;
-    void stream.start().catch((err) => {
-      const message = err instanceof Error ? err.message : String(err);
-      LogBus.error("deaf-session", "whisper stream start failed", { message });
-    });
+    const roomSnap = useRoomStore.getState();
+    const roomIdSnap = roomSnap.roomId;
+    const identitySnap = roomSnap.identity;
+    if (!roomIdSnap || !identitySnap) {
+      LogBus.warn("deaf-session", "stt skipped: missing room context");
+      return;
+    }
+
+    let cancelled = false;
+    let started: SttStream | null = null;
+    void (async () => {
+      let signedUrl: string;
+      try {
+        const fresh = await mintElevenLabsSttSignedUrl({
+          roomId: roomIdSnap,
+          identity: identitySnap,
+          role: "deaf",
+        });
+        signedUrl = fresh.signedUrl;
+        LogBus.info("deaf-session", "stt signed url minted", {
+          expiresAt: fresh.expiresAt,
+        });
+      } catch (err) {
+        if (cancelled) return;
+        const message = err instanceof Error ? err.message : String(err);
+        LogBus.error("deaf-session", "stt url mint failed", { message });
+        toast.error("Captions unavailable");
+        return;
+      }
+      if (cancelled) return;
+      const stream = createSttStream({
+        signedUrl,
+        remoteAudioTrack,
+        speaker,
+        publish: (msg) => publishRef.current(msg),
+      });
+      started = stream;
+      sttStreamRef.current = stream;
+      try {
+        await stream.start();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        LogBus.error("deaf-session", "stt stream start failed", { message });
+      }
+    })();
+
     return () => {
-      if (whisperStreamRef.current === stream) whisperStreamRef.current = null;
-      void stream.stop();
+      cancelled = true;
+      const stream = started;
+      if (stream && sttStreamRef.current === stream) {
+        sttStreamRef.current = null;
+      }
+      if (stream) void stream.stop();
     };
-    // whisperModelId is excluded — switching the variant requires a hard
-    // reload anyway (the lobby prewarms a single variant per session).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remoteAudioTrack, remoteParticipant]);
 
   // ----- stitching: OpenRouter reconstruct -----------------------------------
@@ -308,6 +349,24 @@ export function DeafSession({
     }));
     const hearingTranscript = transcriptCtxRef.current().join(" ").trim();
 
+    // Mirror what reconstruct() builds so the debug pane can show the exact
+    // prompt being sent before the call lands. Re-using the shared builder
+    // keeps this in lockstep with the wire payload.
+    const previewBody = buildReconstructionRequest({
+      hearingTranscript,
+      topK,
+      modelId,
+    });
+    const [previewSystem, previewUser] = previewBody.messages;
+    const sentAt = Date.now();
+    useDebugSignalsStore.getState().setReconstructPromptPending({
+      modelId,
+      systemPrompt: previewSystem?.content ?? "",
+      userPrompt: previewUser?.content ?? "",
+      signs: tokens.map((t) => t.label),
+      sentAt,
+    });
+
     const attempt = async (isRetry: boolean): Promise<void> => {
       try {
         const result = await reconstruct({
@@ -320,6 +379,27 @@ export function DeafSession({
           LogBus.debug("deaf-session", "stale reconstruct dropped");
           return;
         }
+        useDebugSignalsStore.getState().patchReconstructPrompt({
+          status: "ok",
+          latencyMs: result.latencyMs,
+          parsed: result.parsed,
+          raw: result.raw,
+          ...(result.usage?.inputTokens !== undefined
+            ? { inputTokens: result.usage.inputTokens }
+            : {}),
+          ...(result.usage?.outputTokens !== undefined
+            ? { outputTokens: result.usage.outputTokens }
+            : {}),
+          ...(result.costUsd !== undefined ? { costUsd: result.costUsd } : {}),
+        });
+        // Stash broadcast metadata before setReconstruction. In Auto mode
+        // the controller transitions straight to speaking (no handleApprove
+        // runs to populate this), so the speaking effect would otherwise
+        // fall back to defaults for confidence/usedSigns.
+        approveContextRef.current = {
+          confidence: result.parsed.confidence,
+          usedSigns: result.parsed.usedSigns,
+        };
         controller.setReconstruction(result.parsed);
       } catch (err) {
         if (controller.epoch() !== epoch) return;
@@ -331,6 +411,11 @@ export function DeafSession({
           return;
         }
         const message = err instanceof Error ? err.message : String(err);
+        useDebugSignalsStore.getState().patchReconstructPrompt({
+          status: "error",
+          latencyMs: Date.now() - sentAt,
+          errorMessage: message,
+        });
         if (isQuotaExhausted(message)) {
           toast.error(
             "Session budget exhausted — refresh or open a new room",
@@ -368,12 +453,6 @@ export function DeafSession({
     const credSnap = useCredentialsStore.getState();
     const prefSnap = usePreferencesStore.getState();
     const roomSnap = useRoomStore.getState();
-    const signedUrl = credSnap.elevenlabs?.signedUrl;
-    if (!signedUrl) {
-      toast.error("Voice unavailable — re-sign");
-      controller.speakingError("ElevenLabs signed URL missing");
-      return;
-    }
     const r = roomRef.current;
     if (!r) {
       controller.speakingError("LiveKit room not available");
@@ -392,20 +471,49 @@ export function DeafSession({
     let wss: Awaited<ReturnType<typeof openTurnWss>> | null = null;
     void (async () => {
       const mixer = ensureMixer(mixerRef);
-      try {
-        try {
-          const micStream = await navigator.mediaDevices.getUserMedia({
-            audio: MIC_CONSTRAINTS,
-            video: false,
-          });
-          mixer.attachMic(micStream);
-        } catch (err) {
-          LogBus.warn(
-            "deaf-session",
-            "mic acquire failed; continuing without duck",
-            { error: err instanceof Error ? err.message : String(err) },
+
+      // ElevenLabs signed URLs embed a single_use_token consumed per
+      // WS connection. The cached URL is the next-to-use one; if it's
+      // missing (post-turn pre-mint hadn't completed yet) we mint
+      // synchronously here. This adds ~250ms p50 only on cache miss.
+      let signedUrl: string | null =
+        useCredentialsStore.getState().elevenlabs?.signedUrl ?? null;
+      if (!signedUrl) {
+        if (!roomIdSnap || !identitySnap) {
+          controller.speakingError(
+            "Cannot mint ElevenLabs URL without room context",
           );
+          return;
         }
+        const voiceId =
+          usePreferencesStore.getState().elevenlabsVoiceId ?? undefined;
+        try {
+          const fresh = await mintElevenLabsSignedUrl({
+            roomId: roomIdSnap,
+            identity: identitySnap,
+            role: "deaf",
+            ...(voiceId ? { voiceId } : {}),
+          });
+          useCredentialsStore.getState().setElevenLabs({
+            signedUrl: fresh.signedUrl,
+            voiceId: fresh.voiceId,
+            modelId: fresh.modelId,
+            outputFormat: fresh.outputFormat,
+            expiresAt: fresh.expiresAt,
+          });
+          signedUrl = fresh.signedUrl;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          toast.error("Voice unavailable — re-sign");
+          controller.speakingError(`ElevenLabs URL mint failed: ${message}`);
+          return;
+        }
+      }
+
+      try {
+        // ensureMixedPublished both swaps the raw mic publication for the
+        // mixed signchat-voice track and attaches the existing LiveKit mic
+        // capture into the mixer (no second getUserMedia call).
         await ensureMixedPublished(r, mixer, mixedPubRef);
 
         const flags = useDebugFlagsStore.getState();
@@ -474,10 +582,13 @@ export function DeafSession({
         if (looksLikeUrlExpiry(message)) {
           // Re-mint proactively so the next turn has a fresh URL ready.
           if (roomIdSnap && identitySnap) {
+            const voiceId =
+              usePreferencesStore.getState().elevenlabsVoiceId ?? undefined;
             void mintElevenLabsSignedUrl({
               roomId: roomIdSnap,
               identity: identitySnap,
               role: "deaf",
+              ...(voiceId ? { voiceId } : {}),
             })
               .then((fresh) => {
                 useCredentialsStore.getState().setElevenLabs({
@@ -510,6 +621,42 @@ export function DeafSession({
           } catch {
             // ignore
           }
+          // Invalidate the cached URL (the single_use_token has been
+          // consumed by the WSS we just opened, regardless of whether
+          // speak() succeeded) and kick off a background pre-mint for
+          // the next turn. The mint runs while the user is signing
+          // their next sentence, so the next speaking effect lands on
+          // a fresh cache hit with zero added latency.
+          useCredentialsStore.getState().setElevenLabs(null);
+          if (roomIdSnap && identitySnap) {
+            const voiceId =
+              usePreferencesStore.getState().elevenlabsVoiceId ?? undefined;
+            void mintElevenLabsSignedUrl({
+              roomId: roomIdSnap,
+              identity: identitySnap,
+              role: "deaf",
+              ...(voiceId ? { voiceId } : {}),
+            })
+              .then((fresh) => {
+                useCredentialsStore.getState().setElevenLabs({
+                  signedUrl: fresh.signedUrl,
+                  voiceId: fresh.voiceId,
+                  modelId: fresh.modelId,
+                  outputFormat: fresh.outputFormat,
+                  expiresAt: fresh.expiresAt,
+                });
+                LogBus.debug(
+                  "deaf-session",
+                  "next-turn elevenlabs url pre-minted",
+                  { expiresAt: fresh.expiresAt },
+                );
+              })
+              .catch((err) => {
+                LogBus.warn("deaf-session", "next-turn pre-mint failed", {
+                  error: err instanceof Error ? err.message : String(err),
+                });
+              });
+          }
         }
       }
     })();
@@ -525,7 +672,14 @@ export function DeafSession({
 
     const fireIn = Math.max(0, expiry - Date.now() - REMINT_THRESHOLD_MS);
     const timer = setTimeout(() => {
-      void mintElevenLabsSignedUrl({ roomId, identity, role: "deaf" })
+      const voiceId =
+        usePreferencesStore.getState().elevenlabsVoiceId ?? undefined;
+      void mintElevenLabsSignedUrl({
+        roomId,
+        identity,
+        role: "deaf",
+        ...(voiceId ? { voiceId } : {}),
+      })
         .then((fresh) => {
           setElevenLabs({
             signedUrl: fresh.signedUrl,
@@ -586,6 +740,14 @@ export function DeafSession({
   const handleApprove = (text: string) => {
     const c = controllerRef.current;
     if (!c) return;
+    // Resume the AudioContext under the user-gesture window so the mixer's
+    // MediaStreamDestination starts producing real samples before the first
+    // PCM chunk arrives over the WSS. The context is created suspended per
+    // browser autoplay policy; speak() also calls resume() but by then we
+    // may have lost user activation through the await chain.
+    void ensureMixer(mixerRef).resume().catch(() => {
+      // Already running, or interrupted — speak()'s own resume() will retry.
+    });
     const preview = c.snapshot().preview;
     if (preview) {
       approveContextRef.current = {
@@ -653,16 +815,35 @@ async function ensureMixedPublished(
 ): Promise<void> {
   if (pubRef.current) return;
   const lp = room.localParticipant;
-  // §5.2 / §8.2: only one outgoing audio track. Unpublish any existing mic
-  // before publishing the mixed signchat-voice track.
+  // §5.2 / §8.2: only one outgoing audio track. Reuse the LiveKit-managed
+  // mic capture for the mixer rather than acquiring a parallel mic via
+  // getUserMedia — a second capture of the same device shares no AEC
+  // reference with the first, captures the audio output (Hearing voice
+  // from speakers), and produces a feedback loop into signchat-voice.
+  // We unpublish the raw mic with stopOnUnpublish=false so the underlying
+  // MediaStreamTrack survives and can drive the mixer.
+  let micMediaTrack: MediaStreamTrack | null = null;
   for (const pub of lp.audioTrackPublications.values()) {
     if (pub.source === Track.Source.Microphone && pub.track) {
+      const liveTrack = pub.track as LocalAudioTrack;
+      if (!micMediaTrack) micMediaTrack = liveTrack.mediaStreamTrack;
       try {
-        await lp.unpublishTrack(pub.track, true);
+        await lp.unpublishTrack(liveTrack, false);
       } catch {
         // ignore
       }
     }
+  }
+  if (micMediaTrack) {
+    mixer.attachMic(new MediaStream([micMediaTrack]));
+    LogBus.debug("deaf-session", "mixer reusing live mic", {
+      trackId: micMediaTrack.id,
+    });
+  } else {
+    LogBus.warn(
+      "deaf-session",
+      "no local mic available for mixer (joined with mic off?)",
+    );
   }
   pubRef.current = await lp.publishTrack(mixer.outputTrack, {
     source: Track.Source.Microphone,

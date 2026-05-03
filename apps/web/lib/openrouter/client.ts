@@ -1,11 +1,13 @@
 "use client";
 
-import type { ReconstructionPayload, SignBuffer } from "@signchat/contracts";
+import type { ReconstructionPayload } from "@signchat/contracts";
 import {
   buildReconstructionRequest,
   parseReconstructionResponse,
   ReconstructionParseError,
   type ReconstructionModelId,
+  type SignTokenAlternative,
+  type SignTokenTopK,
 } from "@signchat/prompts";
 import { LogBus } from "@/lib/diagnostics/log-bus";
 import { mark, newTurnId } from "@/lib/diagnostics/latency-markers";
@@ -15,10 +17,11 @@ import { mark, newTurnId } from "@/lib/diagnostics/latency-markers";
  * The hop is browser → openrouter.ai (never through Vercel) so the deaf-side
  * latency budget stays at one round trip — see ARCHITECTURE.md §5.7 / §11.1.
  *
- * Body construction and response parsing are delegated to @signchat/prompts
- * so this client cannot drift from the shared prompt contract; this file just
- * owns the network call, abort/cancel handling, latency markers, and the
- * /models catalog lookup the pane uses for pricing.
+ * Body construction and response parsing are delegated to @signchat/prompts,
+ * which owns the lean-options template (winner of the prompt-tester sweep —
+ * see prompt-tester-service/charts/RESULTS.md). This file just owns the
+ * network call, abort/cancel handling, latency markers, and the /models
+ * catalog lookup the pane uses for pricing.
  */
 
 const OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -27,24 +30,7 @@ const APP_URL = "https://signchat.org";
 const APP_NAME = "Signchat";
 
 export type OpenRouterModelId = ReconstructionModelId;
-
-export interface SignTokenAlternative {
-  word: string;
-  score: number;
-}
-
-/**
- * Per-frame top-K classifier output for a single sign turn. Order matters —
- * it's the temporal order the signer produced the signs in. The shared
- * @signchat/prompts builder consumes only the top-1 (`word`) per slot, so
- * `alternatives` is currently unused but kept on the wire so the call site
- * doesn't need to drop fields it already has on hand.
- */
-export interface SignTokenTopK {
-  word: string;
-  score: number;
-  alternatives: readonly SignTokenAlternative[];
-}
+export type { SignTokenAlternative, SignTokenTopK };
 
 export interface ReconstructRequest {
   /** OpenRouter session key minted by /api/openrouter/session-key. */
@@ -109,14 +95,11 @@ interface OpenRouterChatResponse {
 export async function reconstruct(
   req: ReconstructRequest,
 ): Promise<ReconstructionResult> {
-  const buffer = topKToSignBuffer(req.topK);
-  const transcriptContext =
-    req.hearingTranscript.trim().length > 0 ? [req.hearingTranscript] : [];
-  const body = buildReconstructionRequest(
-    buffer,
-    transcriptContext,
-    req.modelId,
-  );
+  const body = buildReconstructionRequest({
+    hearingTranscript: req.hearingTranscript,
+    topK: req.topK,
+    modelId: req.modelId,
+  });
   const [systemMessage, userMessage] = body.messages;
   const systemPrompt = systemMessage?.content ?? "";
   const userPrompt = userMessage?.content ?? "";
@@ -211,26 +194,6 @@ export async function reconstruct(
     userPrompt,
     ...(usage ? { usage } : {}),
     ...(costUsd !== undefined ? { costUsd } : {}),
-  };
-}
-
-// the @signchat/prompts builder consumes a SignBuffer but the call site (and
-// the workbench surface we promised to preserve) speaks in SignTokenTopK[].
-// build a minimal SignBuffer from the top-1 of each slot — startedAt /
-// lastAdmitAt / epoch are unused by the builder but kept honest so this
-// passes typecheck against the contract.
-function topKToSignBuffer(topK: ReadonlyArray<SignTokenTopK>): SignBuffer {
-  const now = Date.now();
-  return {
-    tokens: topK.map((slot, i) => ({
-      label: slot.word,
-      score: slot.score,
-      ts: now + i,
-      via: "stable",
-    })),
-    startedAt: now,
-    lastAdmitAt: topK.length > 0 ? now : null,
-    epoch: 0,
   };
 }
 

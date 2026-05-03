@@ -27,11 +27,14 @@ const EMPTY_SNAPSHOT: ModeSnapshot = Object.freeze({
     top2Threshold: 0.3,
     silenceMs: 2000,
     inferenceIntervalMs: 500,
+    autoStartThreshold: 0.25,
+    autoStopThreshold: 0.03,
   },
   preview: null,
   speakingSentence: null,
   error: null,
   enteredStateAt: 0,
+  lowConfidenceStartedAt: null,
 }) as ModeSnapshot;
 
 class ControllerStoreImpl {

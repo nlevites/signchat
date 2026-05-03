@@ -12,6 +12,10 @@ export interface AutoThresholds {
   top2Threshold: number;
   silenceMs: number;
   inferenceIntervalMs: number;
+  /** Auto mode: top1 score that auto-triggers idle → capturing on a single tick. */
+  autoStartThreshold: number;
+  /** Auto mode: top1 score below which the silence streak accumulates. */
+  autoStopThreshold: number;
 }
 
 export const DEFAULT_AUTO_THRESHOLDS: AutoThresholds = {
@@ -19,4 +23,6 @@ export const DEFAULT_AUTO_THRESHOLDS: AutoThresholds = {
   top2Threshold: 0.3,
   silenceMs: 2000,
   inferenceIntervalMs: 500,
+  autoStartThreshold: 0.25,
+  autoStopThreshold: 0.03,
 };

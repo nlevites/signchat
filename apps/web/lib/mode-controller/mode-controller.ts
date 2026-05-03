@@ -1,15 +1,23 @@
 /**
  * Pure §9 mode controller. Owns the FSM, the SignBuffer, the §9.3 admit
- * logic, and the Auto silence timer. No React, no DOM, no SDK calls — the
- * pane wires async work (OpenRouter, ElevenLabs, LiveKit publish) on top
- * of the controller's state transitions and notifies the controller of
- * results via `setReconstruction`, `speakingDone`, etc.
+ * logic, and the Auto confidence-streak detection. No React, no DOM, no
+ * SDK calls — the pane wires async work (OpenRouter, ElevenLabs, LiveKit
+ * publish) on top of the controller's state transitions and notifies the
+ * controller of results via `setReconstruction`, `speakingDone`, etc.
  *
  * Single-shot per pane: `createModeController()` returns a fresh
  * controller; the pane disposes it on unmount via the returned `dispose`
- * method (clears any pending silence timer). State changes notify
- * subscribers synchronously; subscribers should call `snapshot()` to
- * read the immutable view.
+ * method. State changes notify subscribers synchronously; subscribers
+ * should call `snapshot()` to read the immutable view.
+ *
+ * Auto-mode transitions are confidence-driven (no manual button needed):
+ *   - idle → capturing: top1.score ≥ autoStartThreshold on a single tick
+ *   - capturing → stitching: top1.score < autoStopThreshold sustained for
+ *     silenceMs (or → idle if buffer is empty when the streak completes)
+ *   - stitching → speaking: setReconstruction auto-approves (no preview UX)
+ *
+ * Manual mode keeps the explicit Start/Stop buttons and the
+ * Preview/Approve/Edit/Re-sign/Discard UX.
  */
 
 import {
@@ -22,6 +30,7 @@ import {
   type SignToken,
 } from "@signchat/contracts";
 import { STABILITY_TICKS } from "@signchat/sign-pipeline";
+import { LogBus } from "@/lib/diagnostics/log-bus";
 import type { ClassifierResult } from "@/lib/sign-pipeline/classifier";
 
 export interface ModeControllerOptions {
@@ -40,8 +49,14 @@ export interface ModeSnapshot {
   speakingSentence: string | null;
   /** Last user-facing error message, if any. Cleared on next `start()`. */
   error: string | null;
-  /** Wall-clock ms when the current state was entered; useful for ageing the silence timer in the UI. */
+  /** Wall-clock ms when the current state was entered. */
   enteredStateAt: number;
+  /**
+   * Wall-clock ms when the current sub-autoStopThreshold streak began. Null
+   * when not in a streak (i.e., classifier confidence is above the floor).
+   * The Auto silence countdown UI reads this; when null, no countdown shows.
+   */
+  lowConfidenceStartedAt: number | null;
 }
 
 export interface ModeController {
@@ -65,7 +80,7 @@ export interface ModeController {
   snapshot(): ModeSnapshot;
   /** Latest buffer epoch — async consumers compare against this on resolve. */
   epoch(): number;
-  /** Stop silence timer + drop subscribers. Call from unmount. */
+  /** Drop subscribers. Call from unmount. */
   dispose(): void;
 }
 
@@ -87,13 +102,13 @@ export function createModeController(
   let speakingSentence: string | null = null;
   let error: string | null = null;
   let enteredStateAt: number = Date.now();
+  let lowConfidenceStartedAt: number | null = null;
   let cachedSnapshot: ModeSnapshot = buildSnapshot();
 
   // Admit-logic memory.
   let lastTickTop1: { label: string; score: number } | null = null;
   let lastAdmitLabel: string | null = null;
   let stitchEpoch = 0;
-  let silenceTimer: ReturnType<typeof setTimeout> | null = null;
   const subscribers = new Set<() => void>();
 
   function buildSnapshot(): ModeSnapshot {
@@ -106,6 +121,7 @@ export function createModeController(
       speakingSentence,
       error,
       enteredStateAt,
+      lowConfidenceStartedAt,
     };
   }
 
@@ -123,33 +139,7 @@ export function createModeController(
   function transition(next: ModeState): void {
     state = next;
     enteredStateAt = Date.now();
-  }
-
-  function clearSilenceTimer(): void {
-    if (silenceTimer !== null) {
-      clearTimeout(silenceTimer);
-      silenceTimer = null;
-    }
-  }
-
-  function armSilenceTimer(): void {
-    clearSilenceTimer();
-    if (mode !== "auto" || state !== "capturing") return;
-    silenceTimer = setTimeout(() => {
-      silenceTimer = null;
-      // Only ship if the buffer has at least one admit and we're still
-      // in capturing — Cancel/Discard would have transitioned already.
-      if (state !== "capturing") return;
-      if (buffer.tokens.length === 0) {
-        // No admits during the silence window; nothing to say. Stay in
-        // capturing and re-arm so the user can keep signing.
-        armSilenceTimer();
-        return;
-      }
-      stitchEpoch += 1;
-      transition("stitching");
-      notify();
-    }, thresholds.silenceMs);
+    lowConfidenceStartedAt = null;
   }
 
   function startBuffer(): void {
@@ -176,16 +166,13 @@ export function createModeController(
     setMode(next: CaptureMode): void {
       if (next === mode) return;
       mode = next;
-      // Re-arm or cancel silence timer to match the new mode.
-      if (state === "capturing") {
-        if (mode === "auto") armSilenceTimer();
-        else clearSilenceTimer();
-      }
+      // Switching to manual mid-capture clears the auto silence streak so
+      // the explicit Stop button is the only way out.
+      if (next === "manual") lowConfidenceStartedAt = null;
       notify();
     },
     setThresholds(next: AutoThresholds): void {
       thresholds = { ...next };
-      if (state === "capturing" && mode === "auto") armSilenceTimer();
       notify();
     },
     start(): void {
@@ -197,20 +184,17 @@ export function createModeController(
       speakingSentence = null;
       startBuffer();
       transition("capturing");
-      armSilenceTimer();
       notify();
     },
     stopManual(): void {
       if (state !== "capturing") return;
       if (buffer.tokens.length === 0) return; // nothing to stitch
-      clearSilenceTimer();
       stitchEpoch += 1;
       transition("stitching");
       notify();
     },
     cancel(): void {
       if (state !== "capturing") return;
-      clearSilenceTimer();
       buffer = EMPTY_BUFFER;
       stitchEpoch += 1;
       transition("idle");
@@ -221,7 +205,6 @@ export function createModeController(
       preview = null;
       startBuffer();
       transition("capturing");
-      armSilenceTimer();
       notify();
     },
     discard(): void {
@@ -242,17 +225,79 @@ export function createModeController(
       notify();
     },
     ingest(result: ClassifierResult): void {
-      if (state !== "capturing") {
-        // Stale ticks during stitching/preview/speaking are silently
-        // dropped — the controller only consumes ClassifierResults while
-        // capturing.
-        return;
-      }
-      if (result.top.length === 0) {
-        return;
-      }
+      if (result.top.length === 0) return;
       const top1 = result.top[0]!;
       const top2 = result.top[1] ?? null;
+
+      // ---- Auto-start: idle → capturing on a high-confidence tick. ----
+      if (
+        state === "idle" &&
+        mode === "auto" &&
+        top1.score >= thresholds.autoStartThreshold
+      ) {
+        LogBus.debug("mode-controller", "auto-start", {
+          label: top1.label,
+          score: top1.score,
+          autoStartThreshold: thresholds.autoStartThreshold,
+        });
+        error = null;
+        preview = null;
+        speakingSentence = null;
+        startBuffer();
+        transition("capturing");
+        // fall through so this tick is also fed to the admit logic below;
+        // it seeds lastTickTop1 so a subsequent tick at the same label can
+        // satisfy STABILITY_TICKS.
+      }
+
+      // The controller only consumes ClassifierResults while capturing
+      // (auto-start above may have just transitioned us into it). Stale
+      // ticks during stitching/preview/speaking are silently dropped.
+      if (state !== "capturing") return;
+
+      // ---- Auto-stop: track the sub-autoStopThreshold streak. ----
+      // Only run the streak after at least one admit has landed in this
+      // turn. Otherwise the user has just clicked Start (or auto-started
+      // on a transient top1 spike) and is preparing to sign — bouncing
+      // them back to idle 2s later would be terrible UX. Cancel is still
+      // available manually.
+      //
+      // Use Date.now() (wall-clock) for the streak so the snapshot field
+      // shares an axis with enteredStateAt and the CaptureControls
+      // countdown chip's nowMs = Date.now(). The classifier's result.ts
+      // is performance.now() which is page-load-relative and would put
+      // ~1.7e12 ms of error into any UI math against Date.now().
+      if (mode === "auto" && buffer.tokens.length > 0) {
+        const nowWall = Date.now();
+        if (top1.score < thresholds.autoStopThreshold) {
+          if (lowConfidenceStartedAt === null) {
+            lowConfidenceStartedAt = nowWall;
+            LogBus.debug("mode-controller", "low-confidence streak begin", {
+              score: top1.score,
+              autoStopThreshold: thresholds.autoStopThreshold,
+            });
+            notify();
+          } else if (nowWall - lowConfidenceStartedAt >= thresholds.silenceMs) {
+            LogBus.debug("mode-controller", "auto-stop -> stitching", {
+              tokens: buffer.tokens.length,
+              silenceMs: thresholds.silenceMs,
+            });
+            lowConfidenceStartedAt = null;
+            stitchEpoch += 1;
+            transition("stitching");
+            notify();
+            return;
+          }
+        } else if (lowConfidenceStartedAt !== null) {
+          lowConfidenceStartedAt = null;
+          notify();
+        }
+      } else if (mode === "auto" && lowConfidenceStartedAt !== null) {
+        // Buffer drained (e.g., post-stitching reset arrived mid-tick) —
+        // clear any in-flight streak so the chip doesn't linger.
+        lowConfidenceStartedAt = null;
+        notify();
+      }
 
       let admitted: SignToken | null = null;
 
@@ -295,11 +340,7 @@ export function createModeController(
         };
       }
 
-      if (admitted) {
-        admit(admitted);
-        if (mode === "auto") armSilenceTimer();
-      }
-
+      if (admitted) admit(admitted);
       lastTickTop1 = { label: top1.label, score: top1.score };
       if (admitted) notify();
     },
@@ -307,6 +348,28 @@ export function createModeController(
       // Only accept while in stitching; if a Cancel/Discard fired, the state
       // will already be `idle` and we drop this stale callback.
       if (state !== "stitching") return;
+      if (mode === "auto") {
+        // Auto mode skips the Preview / Approve UX and ships the LLM's
+        // sentence straight to the speaking stage. The DeafSession's
+        // approveContextRef must be populated before this call so the
+        // §11.4 caption broadcast carries the right confidence/usedSigns.
+        const trimmed = payload.sentence.trim();
+        if (trimmed.length === 0) {
+          // Treat as parse failure rather than ship empty audio.
+          error = "LLM returned empty sentence";
+          preview = null;
+          buffer = EMPTY_BUFFER;
+          stitchEpoch += 1;
+          transition("idle");
+          notify();
+          return;
+        }
+        speakingSentence = trimmed;
+        preview = null;
+        transition("speaking");
+        notify();
+        return;
+      }
       preview = payload;
       transition("preview");
       notify();
@@ -348,7 +411,6 @@ export function createModeController(
       return stitchEpoch;
     },
     dispose(): void {
-      clearSilenceTimer();
       subscribers.clear();
     },
   };

@@ -49,14 +49,14 @@ const LATENCY_ROWS: ReadonlyArray<LatencyRow> = [
     budgetP95: 1600,
   },
   {
-    stage: "whisper.first-partial",
-    label: "Whisper first partial",
+    stage: "stt.first-partial",
+    label: "STT first partial",
     budgetP50: null,
     budgetP95: null,
   },
   {
-    stage: "whisper.partial",
-    label: "Whisper partial",
+    stage: "stt.committed",
+    label: "STT committed",
     budgetP50: null,
     budgetP95: null,
   },

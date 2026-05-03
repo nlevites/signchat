@@ -21,6 +21,10 @@ export type {
   CreateOpenRouterSessionKeyResponse,
   CreateElevenLabsSignedUrlRequest,
   CreateElevenLabsSignedUrlResponse,
+  ElevenLabsVoiceSummary,
+  ListElevenLabsVoicesResponse,
+  CreateElevenLabsSttSignedUrlRequest,
+  CreateElevenLabsSttSignedUrlResponse,
   HealthResponse,
   ApiError,
 } from "./api";

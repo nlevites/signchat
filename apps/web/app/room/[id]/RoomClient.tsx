@@ -17,6 +17,7 @@ import { ConnectionBadge } from "@/components/room/ConnectionBadge";
 import { DeafSession } from "@/components/room/DeafSession";
 import { DebugView } from "@/components/room/DebugView";
 import { Lobby, type LobbyDeviceState } from "@/components/room/Lobby";
+import { SettingsPanel } from "@/components/room/SettingsPanel";
 import { TranscriptStrip } from "@/components/room/TranscriptStrip";
 import { VideoTile } from "@/components/room/VideoTile";
 import { ViewToggle, type ViewMode } from "@/components/room/ViewToggle";
@@ -86,6 +87,11 @@ export function RoomClient({ roomId }: RoomClientProps) {
       setConnectionState("idle");
       clearLiveKitCredentials();
       clearCredentials();
+      // Reset ephemeral session state so navigating into a fresh room
+      // doesn't carry over chat history, captions, or remote-participant
+      // metadata from the previous call.
+      useTranscriptStore.getState().clear();
+      useRoomStore.getState().reset();
     };
   }, [
     roomId,
@@ -120,6 +126,10 @@ export function RoomClient({ roomId }: RoomClientProps) {
   const handleJoin = async (d: LobbyDeviceState): Promise<void> => {
     setDevices(d);
     setConnectionState("connecting");
+    // Read the picked voice once at join time; in-call swaps go through
+    // SettingsPanel's onVoiceChange and re-mint independently.
+    const voiceId =
+      usePreferencesStore.getState().elevenlabsVoiceId ?? undefined;
     try {
       // LiveKit + (Deaf only) OpenRouter + ElevenLabs all mint in parallel
       // so the join click → connected transition isn't serialized.
@@ -128,7 +138,12 @@ export function RoomClient({ roomId }: RoomClientProps) {
         role === "deaf"
           ? Promise.all([
               mintOpenRouterSessionKey({ roomId, identity, role: "deaf" }),
-              mintElevenLabsSignedUrl({ roomId, identity, role: "deaf" }),
+              mintElevenLabsSignedUrl({
+                roomId,
+                identity,
+                role: "deaf",
+                ...(voiceId ? { voiceId } : {}),
+              }),
             ])
           : Promise.resolve(null),
       ]);
@@ -245,6 +260,12 @@ function ActiveRoom({
 
   const isDeaf = role === "deaf";
 
+  const [inviteUrl, setInviteUrl] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setInviteUrl(`${window.location.origin}/room/${encodeURIComponent(roomId)}`);
+  }, [roomId]);
+
   // Pull last 4 hearing-side transcript lines lazily so the DeafSession
   // stitching effect doesn't re-fire on every transcript update.
   const hearingTranscriptContext = useCallback((): string[] => {
@@ -355,7 +376,11 @@ function ActiveRoom({
                   showDeafCaption={remoteRole === "deaf"}
                 />
               ) : (
-                <VideoTile empty />
+                <VideoTile
+                  empty
+                  inviteRoomCode={roomId}
+                  inviteUrl={inviteUrl}
+                />
               )}
             </div>
 
@@ -366,7 +391,7 @@ function ActiveRoom({
                   state={modeSnapshot.state}
                   buffer={modeSnapshot.buffer}
                   silenceMs={prefsThresholds.silenceMs}
-                  enteredStateAt={modeSnapshot.enteredStateAt}
+                  lowConfidenceStartedAt={modeSnapshot.lowConfidenceStartedAt}
                   canStart={canStart}
                   onSetMode={onSetMode}
                   onStart={onStartCapture}
@@ -383,8 +408,14 @@ function ActiveRoom({
               settingsOpen={settingsOpen}
               onToggleMic={() => void toggleMic()}
               onToggleCam={() => void toggleCamera()}
-              onToggleChat={() => setChatOpen((v) => !v)}
-              onToggleSettings={() => setSettingsOpen((v) => !v)}
+              onToggleChat={() => {
+                setChatOpen((v) => !v);
+                setSettingsOpen(false);
+              }}
+              onToggleSettings={() => {
+                setSettingsOpen((v) => !v);
+                setChatOpen(false);
+              }}
               onLeave={() => void handleLeave()}
             />
           </div>
@@ -414,14 +445,21 @@ function ActiveRoom({
         <motion.aside
           className="relative shrink-0 overflow-hidden border-l border-sc-border"
           initial={false}
-          animate={{ width: chatOpen ? 360 : 0 }}
+          animate={{ width: chatOpen || settingsOpen ? 360 : 0 }}
           transition={{ duration: 0.52, ease: [0.32, 0.72, 0, 1] }}
         >
           <div className="absolute inset-y-0 right-0 flex w-[360px] flex-col">
-            <ChatPanel
-              participantInfo={participantInfo}
-              publish={publish}
-            />
+            {settingsOpen ? (
+              <SettingsPanel
+                role={role}
+                onClose={() => setSettingsOpen(false)}
+              />
+            ) : (
+              <ChatPanel
+                participantInfo={participantInfo}
+                publish={publish}
+              />
+            )}
           </div>
         </motion.aside>
       </div>

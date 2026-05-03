@@ -7,6 +7,7 @@ import { cn } from "@/lib/cn";
 const CATALOG_URL = "https://openrouter.ai/api/v1/models";
 
 const KNOWN_MODEL_IDS = [
+  "openai/gpt-5.4-mini",
   "google/gemini-3-flash-preview",
   "anthropic/claude-haiku-4.5",
   "x-ai/grok-4.1-fast",

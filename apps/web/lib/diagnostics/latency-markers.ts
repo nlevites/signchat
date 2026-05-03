@@ -73,9 +73,11 @@ class LatencyStoreImpl {
     if (ring.length > RING_PER_STAGE) ring.shift();
     this.samplesByStage.set(stage, ring);
     this.refreshCaches(stage);
-    LogBus.debug("latency", `${stage} +${Math.round(sample.durationMs)}ms`, {
-      turnId,
-    });
+    // The classifier emits ~10 marks/s — emitting one LogBus.debug per mark
+    // saturates the 1000-entry LogBus ring within seconds and evicts every
+    // one-shot entry from stt, deaf-session, ort, and livekit. Samples
+    // are already retained in samplesByStage; the LatencyTable reads from
+    // there. Keep only the orphan-end warning above.
     this.notify();
   }
 

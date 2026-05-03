@@ -48,6 +48,22 @@ const SLIDERS: ReadonlyArray<SliderSpec> = [
     step: 50,
     format: (v) => `${v} ms`,
   },
+  {
+    key: "autoStartThreshold",
+    label: "Auto start threshold",
+    min: 0.05,
+    max: 0.95,
+    step: 0.01,
+    format: (v) => `${(v * 100).toFixed(0)}%`,
+  },
+  {
+    key: "autoStopThreshold",
+    label: "Auto stop threshold",
+    min: 0.001,
+    max: 0.1,
+    step: 0.005,
+    format: (v) => `${(v * 100).toFixed(1)}%`,
+  },
 ];
 
 export interface ThresholdSlidersProps {
@@ -68,6 +84,8 @@ export function ThresholdSliders({
       top2Threshold: next.top2Threshold,
       silenceMs: next.silenceMs,
       inferenceIntervalMs: next.intervalMs,
+      autoStartThreshold: next.autoStartThreshold,
+      autoStopThreshold: next.autoStopThreshold,
     });
   };
 
