@@ -52,16 +52,16 @@ export function NavBar() {
         <Link
           href="/"
           aria-label="Signchat home"
-          className="relative inline-block"
+          className="relative inline-block translate-y-[10px]"
         >
           <motion.div style={{ opacity: solidOpacity }}>
-            <Logo size={40} wordmarkSize={22} surface="solid" />
+            <Logo size={90} wordmarkSize={50} surface="solid" />
           </motion.div>
           <motion.div
             style={{ opacity: overlayOpacity }}
             className="absolute inset-0"
           >
-            <Logo size={40} wordmarkSize={22} surface="overlay" />
+            <Logo size={90} wordmarkSize={50} surface="overlay" />
           </motion.div>
         </Link>
         <Link
