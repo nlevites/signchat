@@ -36,8 +36,12 @@ export interface ReconstructRequest {
   /** OpenRouter session key minted by /api/openrouter/session-key. */
   apiKey: string;
   modelId: ReconstructionModelId;
-  /** Free-form hearing-side transcript line; empty/whitespace becomes "(none)". */
-  hearingTranscript: string;
+  /**
+   * Recent dialog history formatted as `You said: ...` / `They said: ...`
+   * lines from the Deaf signer's perspective. Empty/whitespace becomes
+   * "(none)".
+   */
+  recentDialog: string;
   /** Per-frame top-K classifier output for the current sign turn. */
   topK: ReadonlyArray<SignTokenTopK>;
   /**
@@ -96,7 +100,7 @@ export async function reconstruct(
   req: ReconstructRequest,
 ): Promise<ReconstructionResult> {
   const body = buildReconstructionRequest({
-    hearingTranscript: req.hearingTranscript,
+    recentDialog: req.recentDialog,
     topK: req.topK,
     modelId: req.modelId,
   });
@@ -110,7 +114,7 @@ export async function reconstruct(
   LogBus.info("openrouter", "reconstruct started", {
     modelId: req.modelId,
     topKLength: req.topK.length,
-    hearingChars: req.hearingTranscript.length,
+    dialogChars: req.recentDialog.length,
   });
 
   const startedAt = performance.now();

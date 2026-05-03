@@ -266,18 +266,25 @@ function ActiveRoom({
     setInviteUrl(`${window.location.origin}/room/${encodeURIComponent(roomId)}`);
   }, [roomId]);
 
-  // Pull last 4 hearing-side transcript lines lazily so the DeafSession
-  // stitching effect doesn't re-fire on every transcript update.
-  const hearingTranscriptContext = useCallback((): string[] => {
-    const t = useTranscriptStore.getState();
-    const finals = t.messages
-      .filter(
-        (m) => m.kind === "transcript_final" || m.kind === "transcript_partial",
-      )
-      .slice(-4)
-      .map((m) => (m.kind === "transcript_final" || m.kind === "transcript_partial" ? m.text : ""))
-      .filter((s) => s.length > 0);
-    return finals;
+  // Build the last 4 dialog turns from the Deaf signer's perspective for the
+  // reconstruction prompt, formatted as `You said:` (own captions, post-TTS)
+  // and `They said:` (hearing user's finalized STT). Read lazily so the
+  // DeafSession stitching effect doesn't re-fire on every transcript update.
+  // Partials are intentionally excluded — they represent an in-progress
+  // utterance, not a completed turn.
+  const recentDialogContext = useCallback((): string[] => {
+    const messages = useTranscriptStore.getState().messages;
+    const turns: string[] = [];
+    for (let i = messages.length - 1; i >= 0 && turns.length < 4; i--) {
+      const m = messages[i];
+      if (!m) continue;
+      if (m.kind === "caption" && m.sentence.length > 0) {
+        turns.push(`You said: ${m.sentence}`);
+      } else if (m.kind === "transcript_final" && m.text.length > 0) {
+        turns.push(`They said: ${m.text}`);
+      }
+    }
+    return turns.reverse();
   }, []);
 
   const participantInfo: ParticipantInfo = {
@@ -358,7 +365,7 @@ function ActiveRoom({
                     localVideoTrack={localVideoTrack}
                     remoteAudioTrack={remoteAudioTrack}
                     participantInfo={participantInfo}
-                    hearingTranscriptContext={hearingTranscriptContext}
+                    recentDialogContext={recentDialogContext}
                     publish={publish}
                   />
                 ) : null}

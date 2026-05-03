@@ -24,7 +24,8 @@ export interface SignTokenTopK {
   alternatives: readonly SignTokenAlternative[];
 }
 
-const LEAN_OPTIONS_USER = `Hearing said: {{hearingTranscript}}
+const LEAN_OPTIONS_USER = `Recent conversation:
+{{recentDialog}}
 Top-K classifier output for the current sign turn:
 {{signTokensTopK}}
 Word translations: {{recognizedSignsTopKDictionary}}
@@ -77,8 +78,17 @@ export interface ReconstructionRequest {
 }
 
 export interface BuildReconstructionRequestArgs {
-  /** The hearing user's most recent transcript line. Empty string is fine. */
-  hearingTranscript: string;
+  /**
+   * The most recent dialog turns leading into this sign turn, formatted as a
+   * newline-delimited transcript from the Deaf signer's perspective:
+   *
+   *     You said: <prior reconstruction>
+   *     They said: <hearing user STT>
+   *     You said: <prior reconstruction>
+   *
+   * Empty string is fine and renders as "(none)" in the prompt.
+   */
+  recentDialog: string;
   /** Per-frame top-K classifier output for the current sign turn. */
   topK: ReadonlyArray<SignTokenTopK>;
   modelId: ReconstructionModelId;
@@ -88,7 +98,7 @@ export function buildReconstructionRequest(
   args: BuildReconstructionRequestArgs,
 ): ReconstructionRequest {
   const userPrompt = composeUserPrompt({
-    hearingTranscript: args.hearingTranscript,
+    recentDialog: args.recentDialog,
     topK: args.topK,
   });
   return {
@@ -104,23 +114,21 @@ export function buildReconstructionRequest(
 }
 
 export interface ComposeUserPromptArgs {
-  hearingTranscript: string;
+  recentDialog: string;
   topK: ReadonlyArray<SignTokenTopK>;
 }
 
 /**
  * Fill the three placeholders that the lean-options user template uses
- * ({{hearingTranscript}}, {{signTokensTopK}}, {{recognizedSignsTopKDictionary}})
+ * ({{recentDialog}}, {{signTokensTopK}}, {{recognizedSignsTopKDictionary}})
  * and return the composed user prompt as a string.
  */
 export function composeUserPrompt(args: ComposeUserPromptArgs): string {
-  const hearing =
-    args.hearingTranscript.trim().length > 0
-      ? args.hearingTranscript
-      : "(none)";
+  const dialog =
+    args.recentDialog.trim().length > 0 ? args.recentDialog : "(none)";
   const topKBlock = JSON.stringify(args.topK, null, 2);
   const dictBlock = formatRecognizedSignsTopKDictionary(args.topK);
-  return LEAN_OPTIONS_USER.replaceAll("{{hearingTranscript}}", hearing)
+  return LEAN_OPTIONS_USER.replaceAll("{{recentDialog}}", dialog)
     .replaceAll("{{signTokensTopK}}", topKBlock)
     .replaceAll("{{recognizedSignsTopKDictionary}}", dictBlock);
 }

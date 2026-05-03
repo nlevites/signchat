@@ -76,7 +76,7 @@ export interface DeafSessionProps {
   localVideoTrack: LocalVideoTrack | null;
   remoteAudioTrack: RemoteAudioTrack | null;
   participantInfo: ParticipantInfo;
-  hearingTranscriptContext: () => string[];
+  recentDialogContext: () => string[];
   /** Publish a RoomDataMessage on the LiveKit data channel. */
   publish: (msg: RoomDataMessage) => Promise<void>;
 }
@@ -86,7 +86,7 @@ export function DeafSession({
   localVideoTrack,
   remoteAudioTrack,
   participantInfo,
-  hearingTranscriptContext,
+  recentDialogContext,
   publish,
 }: DeafSessionProps) {
   const snapshot = useModeSnapshot();
@@ -119,8 +119,8 @@ export function DeafSession({
   roomRef.current = room;
   // Latch the most recent transcript getter so the stitching effect doesn't
   // re-run every time the parent rebinds the callback.
-  const transcriptCtxRef = useRef(hearingTranscriptContext);
-  transcriptCtxRef.current = hearingTranscriptContext;
+  const transcriptCtxRef = useRef(recentDialogContext);
+  transcriptCtxRef.current = recentDialogContext;
   // Latch publish so the stt-stream effect doesn't tear down when the
   // parent rebinds the callback.
   const publishRef = useRef(publish);
@@ -347,13 +347,15 @@ export function DeafSession({
       score: tok.score,
       alternatives: [],
     }));
-    const hearingTranscript = transcriptCtxRef.current().join(" ").trim();
+    // Multi-line dialog block — newline-delimited so each turn renders on
+    // its own line in the user prompt template.
+    const recentDialog = transcriptCtxRef.current().join("\n").trim();
 
     // Mirror what reconstruct() builds so the debug pane can show the exact
     // prompt being sent before the call lands. Re-using the shared builder
     // keeps this in lockstep with the wire payload.
     const previewBody = buildReconstructionRequest({
-      hearingTranscript,
+      recentDialog,
       topK,
       modelId,
     });
@@ -372,7 +374,7 @@ export function DeafSession({
         const result = await reconstruct({
           apiKey,
           modelId,
-          hearingTranscript,
+          recentDialog,
           topK,
         });
         if (controller.epoch() !== epoch) {

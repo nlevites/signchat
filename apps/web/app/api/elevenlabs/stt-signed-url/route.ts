@@ -19,6 +19,9 @@ const TOKEN_TTL_MS = 15 * 60 * 1000;
 const MODEL_ID = "scribe_v2_realtime" as const;
 const AUDIO_FORMAT = "pcm_16000" as const;
 const COMMIT_STRATEGY = "vad" as const;
+// Lock Scribe to English so auto-detect doesn't flip into another language
+// when accent / mic noise / cross-talk confuses per-utterance detection.
+const LANGUAGE_CODE = "en" as const;
 
 function getClientIp(req: Request): string {
   const fwd = req.headers.get("x-forwarded-for");
@@ -44,6 +47,7 @@ function buildSignedWssUrl(singleUseToken: string): string {
   url.searchParams.set("model_id", MODEL_ID);
   url.searchParams.set("audio_format", AUDIO_FORMAT);
   url.searchParams.set("commit_strategy", COMMIT_STRATEGY);
+  url.searchParams.set("language_code", LANGUAGE_CODE);
   url.searchParams.set("token", singleUseToken);
   return url.toString();
 }
