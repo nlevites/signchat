@@ -1,4 +1,3 @@
-import Link from "next/link";
 import s from "./hero-header.module.css";
 
 const HEADING =
@@ -15,6 +14,7 @@ const HEADING =
 interface Integration {
   slug: string;
   label: string;
+  href: string;
   /** widths vary per brand; cap so one wide wordmark doesn't dominate. */
   maxWidth: number;
   /** when set, render <img> + text wordmark in this brand color. */
@@ -24,12 +24,12 @@ interface Integration {
 }
 
 const INTEGRATIONS: Integration[] = [
-  { slug: "zoom",    label: "Zoom",            maxWidth: 96 },
-  { slug: "teams",   label: "Microsoft Teams", maxWidth: 168, wordmarkColor: "#4b53bc", iconSize: 22 },
-  { slug: "meet",    label: "Google Meet",     maxWidth: 156, wordmarkColor: "#5f6368", iconSize: 22 },
-  { slug: "slack",   label: "Slack",           maxWidth: 112, wordmarkColor: "#1d1c1d", iconSize: 22 },
-  { slug: "discord", label: "Discord",         maxWidth: 132 },
-  { slug: "webex",   label: "Webex",           maxWidth: 96 },
+  { slug: "zoom",    label: "Zoom",            href: "https://zoom.us",                                       maxWidth: 96 },
+  { slug: "teams",   label: "Microsoft Teams", href: "https://www.microsoft.com/microsoft-teams",             maxWidth: 168, wordmarkColor: "#4b53bc", iconSize: 22 },
+  { slug: "meet",    label: "Google Meet",     href: "https://meet.google.com",                               maxWidth: 156, wordmarkColor: "#5f6368", iconSize: 22 },
+  { slug: "slack",   label: "Slack",           href: "https://slack.com",                                     maxWidth: 112, wordmarkColor: "#1d1c1d", iconSize: 22 },
+  { slug: "discord", label: "Discord",         href: "https://discord.com",                                   maxWidth: 132 },
+  { slug: "webex",   label: "Webex",           href: "https://www.webex.com",                                 maxWidth: 96 },
 ];
 
 export function IntegrationsBand() {
@@ -38,11 +38,13 @@ export function IntegrationsBand() {
       <div className={s.integrationsInner}>
         <h2 className={s.integrationsHeading}>{HEADING}</h2>
         <ul className={s.integrationsLogos}>
-          {INTEGRATIONS.map(({ slug, label, maxWidth, wordmarkColor, iconSize }) => (
+          {INTEGRATIONS.map(({ slug, label, href, maxWidth, wordmarkColor, iconSize }) => (
             <li key={slug}>
-              <Link
-                href={`/integrations/${slug}`}
-                aria-label={`${label} integration`}
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${label} (opens in new tab)`}
               >
                 {wordmarkColor ? (
                   <span
@@ -81,7 +83,7 @@ export function IntegrationsBand() {
                     style={{ maxWidth, height: 24, width: "auto" }}
                   />
                 )}
-              </Link>
+              </a>
             </li>
           ))}
         </ul>

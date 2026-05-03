@@ -2,7 +2,7 @@
 
 **Status:** authoritative
 **Region pin:** Vercel `pdx1`, LiveKit Cloud us-west PoP
-**Latency target:** sign-end → first audible byte at the Hearing user — p50 ~1.1 s, p95 ~1.6 s
+**Latency target:** sign-end → first audible byte at the Hearing user — p50 ~0.6 s, p95 ~0.9 s
 **Reliability stance:** no fallbacks. A turn either succeeds through the primary path or surfaces a clear error and is re-committed by the signer.
 **Backend stance:** no long-running backend. Vercel hosts the website and short-lived credential-mint API routes; LiveKit Cloud, OpenRouter, and ElevenLabs handle every per-turn data path.
 
