@@ -1,6 +1,6 @@
 {
   "name": "@signchat/bridge",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Sign Chat Bridge — Electron app that runs the signchat pipeline against your webcam, sends synthesised voice to a BlackHole virtual mic, and captures the call's speaker audio for transcription.",
   "main": "dist/main/index.js",

@@ -22,6 +22,8 @@ interface SuiteTab {
   bullets: string[];
   learnMore: string;
   learnMoreHref: string;
+  /** Optional secondary CTA rendered next to `learnMore` (Bridge download). */
+  secondaryCta?: { label: string; href: string; external?: boolean };
   visual: ReactNode;
 }
 
@@ -153,20 +155,25 @@ const TABS: SuiteTab[] = [
   },
   {
     slug: "bridge",
-    label: "Bridge · soon",
+    label: "Bridge",
     icon: <PlugsConnected size={18} weight="regular" />,
     largeIcon: <PlugsConnected size={108} weight="regular" />,
-    headline: "Soon: your voice in FaceTime, Zoom, and Meet.",
+    headline: "Your voice in FaceTime, Zoom, and Meet.",
     body:
       "Bridge is a desktop companion that routes the same Signchat audio graph into a system-level virtual microphone. Open any video tool you already use, pick the Bridge mic, and your signs become spoken sentences in any 1:1 conversation.",
     bullets: [
-      "macOS (BlackHole) and Windows (VB-CABLE) virtual mic targets",
+      "macOS virtual mic via BlackHole — drop into FaceTime, Zoom, Meet, Teams, or Discord",
       "Same browser-direct OpenRouter and ElevenLabs path — no new backend",
-      "Drop into FaceTime, Zoom, Google Meet, Teams, or Discord",
-      "Forward-compatible by design — not in the BeaverHacks 2026 submission",
+      "Live captions of the call piped back from the BlackHole loopback",
+      "Available now — macOS Apple Silicon and Intel",
     ],
-    learnMore: "Bridge roadmap",
-    learnMoreHref: "#bridge",
+    learnMore: "Bridge details",
+    learnMoreHref: "/bridge",
+    secondaryCta: {
+      label: "Download for macOS",
+      href: "https://github.com/nlevites/signchat/releases",
+      external: true,
+    },
     visual: (
       <div className={s.visualBridge}>
         <div className={s.bridgeTargets}>
@@ -245,6 +252,18 @@ export function SignchatSuite() {
                 {tab.learnMore}
                 <ArrowRight size={14} weight="bold" />
               </a>
+              {tab.secondaryCta ? (
+                <a
+                  className={s.learnMore}
+                  href={tab.secondaryCta.href}
+                  {...(tab.secondaryCta.external
+                    ? { target: "_blank", rel: "noreferrer" }
+                    : {})}
+                >
+                  {tab.secondaryCta.label}
+                  <ArrowRight size={14} weight="bold" />
+                </a>
+              ) : null}
               <ul className={s.bullets}>
                 {tab.bullets.map((b) => (
                   <li key={b}>

@@ -14,7 +14,7 @@ interface NavProps {
 /* Product dropdown items map to REAL Signchat surfaces from the
  * architecture / PRD — no invented "agent store" / "studio" entries.
  *  - Signchat Web      → / (the browser 1:1 video app)
- *  - Signchat Bridge   → forward-compatible Electron app (architecture §16)
+ *  - Signchat Bridge   → shipping Electron desktop app (architecture §16)
  *  - ASL Classifier    → custom ASL classifier ONNX model (architecture §5.4)
  *  - Sign Pipeline     → packages/sign-pipeline + prompts
  *  - Architecture      → public technical spec

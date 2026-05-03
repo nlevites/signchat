@@ -1,0 +1,37 @@
+declare const styles: {
+  readonly root: string;
+  readonly headerInner: string;
+  readonly header: string;
+  readonly hero: string;
+  readonly heroInner: string;
+  readonly eyebrow: string;
+  readonly eyebrowDot: string;
+  readonly headline: string;
+  readonly subheadline: string;
+  readonly ctaRow: string;
+  readonly ctaPrimary: string;
+  readonly ctaSecondary: string;
+  readonly heroMeta: string;
+  readonly body: string;
+  readonly bodyInner: string;
+  readonly section: string;
+  readonly sectionHead: string;
+  readonly sectionEyebrow: string;
+  readonly sectionHeading: string;
+  readonly sectionLede: string;
+  readonly features: string;
+  readonly featureIcon: string;
+  readonly featureTitle: string;
+  readonly featureBody: string;
+  readonly steps: string;
+  readonly stepNumber: string;
+  readonly stepBody: string;
+  readonly stepTitle: string;
+  readonly stepDetail: string;
+  readonly outro: string;
+  readonly outroHeading: string;
+  readonly outroBody: string;
+  readonly outroCta: string;
+};
+
+export default styles;
