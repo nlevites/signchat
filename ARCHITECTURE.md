@@ -118,6 +118,8 @@ tools/
 
 Workspace tooling: `pnpm` with workspace protocol, `pnpm -w typecheck && pnpm -w lint && pnpm -w build` from the monorepo root.
 
+**Web UI tokens.** `apps/web/app/globals.css` is the committed single source of truth for `--sc-*` (app-wide) and `--sh-*` (marketing hero header only). A human-readable map of landing composition, nav/dropdown behaviour, CTAs, glass panels, and motion lives in **`apps/web/DESIGN_SYSTEM.md`**.
+
 ---
 
 ## 5. Service inventory
@@ -242,7 +244,7 @@ The Deaf browser publishes these as `transcript_partial` (lossy) and `transcript
 
 The Deaf side's caption flow has two phases:
 
-1. **While signing.** As the mode controller admits sign tokens to the buffer, each token appears as a periwinkle chip on the Deaf user's tile (`PIZZA · ME · LIKE`). This tells the Hearing user that signing is in progress and previews what's being recognized.
+1. **While signing.** As the mode controller admits sign tokens to the buffer, each token appears as a violet-tinted chip on the Deaf user's tile (`PIZZA · ME · LIKE`). This tells the Hearing user that signing is in progress and previews what's being recognized.
 2. **While TTS plays.** After the LLM returns and the user Approves, the browser opens the ElevenLabs WSS and waits for the first PCM chunk. At the moment the first audible sample is scheduled into the AudioContext, the **whole reconstructed sentence appears at once** on the Deaf user's tile and stays pinned for the duration of TTS playback. Subtitle-style — clean, easy to read, no per-word jitter.
 
 The Deaf browser publishes the caption as a `caption` DataChannel message at the same instant it schedules the first audio sample, with `playAtMs = audioContext.currentTime + scheduledOffset` so the Hearing browser can render the caption in lock-step with the audible byte. After audio finishes, the caption transitions into the global Transcript strip and the per-tile overlay clears.
