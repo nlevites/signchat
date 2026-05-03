@@ -8,6 +8,12 @@ export type ConnectionState =
   | "reconnecting"
   | "disconnected";
 
+export interface LiveKitCredentials {
+  wsUrl: string;
+  token: string;
+  tokenExpiresAt: number;
+}
+
 interface RoomState {
   roomId: string | null;
   identity: string | null;
@@ -15,12 +21,17 @@ interface RoomState {
   role: Role | null;
   connectionState: ConnectionState;
   remoteParticipant: ParticipantInfo | null;
+  wsUrl: string | null;
+  token: string | null;
+  tokenExpiresAt: number | null;
   setRoomId: (roomId: string | null) => void;
   setIdentity: (identity: string | null) => void;
   setName: (name: string | null) => void;
   setRole: (role: Role | null) => void;
   setConnectionState: (state: ConnectionState) => void;
   setRemoteParticipant: (p: ParticipantInfo | null) => void;
+  setLiveKitCredentials: (creds: LiveKitCredentials) => void;
+  clearLiveKitCredentials: () => void;
   reset: () => void;
 }
 
@@ -31,6 +42,9 @@ const INITIAL = {
   role: null,
   connectionState: "idle" as ConnectionState,
   remoteParticipant: null,
+  wsUrl: null,
+  token: null,
+  tokenExpiresAt: null,
 };
 
 export const useRoomStore = create<RoomState>((set) => ({
@@ -41,5 +55,9 @@ export const useRoomStore = create<RoomState>((set) => ({
   setRole: (role) => set({ role }),
   setConnectionState: (connectionState) => set({ connectionState }),
   setRemoteParticipant: (remoteParticipant) => set({ remoteParticipant }),
+  setLiveKitCredentials: ({ wsUrl, token, tokenExpiresAt }) =>
+    set({ wsUrl, token, tokenExpiresAt }),
+  clearLiveKitCredentials: () =>
+    set({ wsUrl: null, token: null, tokenExpiresAt: null }),
   reset: () => set(INITIAL),
 }));

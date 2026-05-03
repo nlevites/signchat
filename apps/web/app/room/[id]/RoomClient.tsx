@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Role } from "@signchat/contracts";
 import { Logo } from "@/components/ui/Logo";
 import { ChatPanel } from "@/components/room/ChatPanel";
@@ -11,7 +11,9 @@ import { ControlBar } from "@/components/room/ControlBar";
 import { Lobby, type LobbyDeviceState } from "@/components/room/Lobby";
 import { VideoTile } from "@/components/room/VideoTile";
 import { ViewToggle, type ViewMode } from "@/components/room/ViewToggle";
+import { mintLiveKitToken } from "@/lib/livekit/mint-token";
 import { useRoomStore } from "@/lib/stores";
+import { toast } from "@/lib/stores/toast";
 
 interface RoomClientProps {
   roomId: string;
@@ -22,27 +24,54 @@ function parseRole(raw: string | null): Role | null {
   return null;
 }
 
+// identity must satisfy the api's id regex: [a-zA-Z0-9_\-\s]{1,64}.
+// uuid v4 is 36 chars, only hex + dashes — passes. one per browser context so
+// two windows on the same name don't collide as the same livekit participant.
+function makeIdentity(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `id-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export function RoomClient({ roomId }: RoomClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const role = parseRole(searchParams.get("role"));
   const name = searchParams.get("name") ?? "guest";
+  const identity = useMemo(makeIdentity, []);
   const [joined, setJoined] = useState(false);
   const [, setDevices] = useState<LobbyDeviceState | null>(null);
 
   const setRoomId = useRoomStore((s) => s.setRoomId);
   const setRole = useRoomStore((s) => s.setRole);
   const setName = useRoomStore((s) => s.setName);
+  const setIdentity = useRoomStore((s) => s.setIdentity);
   const setConnectionState = useRoomStore((s) => s.setConnectionState);
+  const setLiveKitCredentials = useRoomStore((s) => s.setLiveKitCredentials);
+  const clearLiveKitCredentials = useRoomStore((s) => s.clearLiveKitCredentials);
 
   useEffect(() => {
     setRoomId(roomId);
     setRole(role);
     setName(name);
+    setIdentity(identity);
     return () => {
       setConnectionState("idle");
+      clearLiveKitCredentials();
     };
-  }, [roomId, role, name, setRoomId, setRole, setName, setConnectionState]);
+  }, [
+    roomId,
+    role,
+    name,
+    identity,
+    setRoomId,
+    setRole,
+    setName,
+    setIdentity,
+    setConnectionState,
+    clearLiveKitCredentials,
+  ]);
 
   if (!role) {
     return (
@@ -60,17 +89,33 @@ export function RoomClient({ roomId }: RoomClientProps) {
     );
   }
 
+  const handleJoin = async (d: LobbyDeviceState): Promise<void> => {
+    setDevices(d);
+    setConnectionState("connecting");
+    try {
+      const creds = await mintLiveKitToken({ roomId, identity, name, role });
+      setLiveKitCredentials({
+        wsUrl: creds.wsUrl,
+        token: creds.token,
+        tokenExpiresAt: creds.tokenExpiresAt,
+      });
+      setJoined(true);
+    } catch (err) {
+      console.error("[room] token mint failed", err);
+      setConnectionState("disconnected");
+      clearLiveKitCredentials();
+      toast.error("Could not get a room token — try again.");
+      throw err;
+    }
+  };
+
   if (!joined) {
     return (
       <Lobby
         roomId={roomId}
         displayName={name}
         role={role}
-        onJoin={(d) => {
-          setDevices(d);
-          setJoined(true);
-          setConnectionState("connecting");
-        }}
+        onJoin={handleJoin}
         onCancel={() => router.push("/start")}
       />
     );

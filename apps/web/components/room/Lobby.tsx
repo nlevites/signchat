@@ -30,7 +30,7 @@ interface LobbyProps {
   roomId: string;
   displayName: string;
   role: Role;
-  onJoin: (devices: LobbyDeviceState) => void;
+  onJoin: (devices: LobbyDeviceState) => void | Promise<void>;
   onCancel: () => void;
 }
 
@@ -171,13 +171,20 @@ export function Lobby({ roomId, displayName, role, onJoin, onCancel }: LobbyProp
     // macos sometimes throws NotReadableError without a brief release window.
     stopStream();
     await new Promise((r) => setTimeout(r, 200));
-    onJoin({
-      audioInputDeviceId: audioInputId,
-      videoInputDeviceId: videoInputId,
-      audioOutputDeviceId: audioOutputId,
-      micEnabled,
-      camEnabled,
-    });
+    try {
+      await onJoin({
+        audioInputDeviceId: audioInputId,
+        videoInputDeviceId: videoInputId,
+        audioOutputDeviceId: audioOutputId,
+        micEnabled,
+        camEnabled,
+      });
+    } catch {
+      // parent surfaces a toast + flips connection state; re-enable the join
+      // button so the user can retry without leaving the lobby.
+      setJoining(false);
+      void acquireStream(audioInputId, videoInputId, micEnabled, camEnabled);
+    }
   };
 
   return (
