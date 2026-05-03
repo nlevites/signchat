@@ -9,19 +9,23 @@ interface LogoProps {
   className?: string;
   wordmarkSize?: number;
   /** "overlay" — full-color 3D PNGs (use on dark/photo bg).
-   *  "solid"  — brand-gradient silhouette via mask-image (use on light surfaces). */
-  surface?: "overlay" | "solid";
+   *  "solid"  — brand-gradient silhouette via mask-image (use on light surfaces).
+   *  "deep"   — darker violet silhouette for tinted light fills (footer ramp). */
+  surface?: "overlay" | "solid" | "deep";
 }
 
-const MASK_COMMON: CSSProperties = {
+const maskGradient = (gradientVar: string): CSSProperties => ({
   WebkitMaskRepeat: "no-repeat",
   maskRepeat: "no-repeat",
   WebkitMaskPosition: "center",
   maskPosition: "center",
   WebkitMaskSize: "contain",
   maskSize: "contain",
-  background: "var(--sc-accent-gradient)",
-};
+  background: gradientVar,
+});
+
+const MASK_SOLID = maskGradient("var(--sc-accent-gradient)");
+const MASK_DEEP = maskGradient("var(--sc-accent-gradient-deep)");
 
 export function Logo({
   size = 28,
@@ -49,17 +53,17 @@ export function Logo({
             className="pointer-events-none absolute -inset-[40%] rounded-full blur-2xl opacity-70"
             style={{
               background:
-                "radial-gradient(closest-side, rgba(117,120,240,0.65), rgba(188,190,249,0.28) 55%, transparent 80%)",
+                "radial-gradient(closest-side, rgba(118,70,199,0.55), rgba(200,176,245,0.30) 55%, transparent 80%)",
             }}
           />
         ) : null}
-        {surface === "solid" ? (
+        {surface === "solid" || surface === "deep" ? (
           <span
             role="img"
             aria-label={markAria}
             className="relative z-[1] block"
             style={{
-              ...MASK_COMMON,
+              ...(surface === "deep" ? MASK_DEEP : MASK_SOLID),
               width: size,
               height: size,
               WebkitMaskImage: "url('/brand/logo-no-bg.png')",
@@ -78,13 +82,13 @@ export function Logo({
         )}
       </span>
       {showWordmark ? (
-        surface === "solid" ? (
+        surface === "solid" || surface === "deep" ? (
           <span
             role="img"
             aria-label="Signchat"
             className="block shrink-0"
             style={{
-              ...MASK_COMMON,
+              ...(surface === "deep" ? MASK_DEEP : MASK_SOLID),
               width: wordmarkWidth,
               height: wordmarkHeight,
               marginLeft: wordmarkPullLeft,
