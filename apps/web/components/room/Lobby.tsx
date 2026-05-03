@@ -12,7 +12,13 @@ import type { Role } from "@signchat/contracts";
 import { Logo } from "@/components/ui/Logo";
 import { DevicePicker } from "@/components/room/DevicePicker";
 import { VoicePicker } from "@/components/room/VoicePicker";
+import {
+  PreflightShell,
+  preflightShell,
+} from "@/components/shells/PreflightShell";
 import { enumerateMediaDevices } from "@/lib/livekit/devices";
+
+const rail = "h-px w-full shrink-0 bg-[#e3e3e2]";
 
 export interface LobbyDeviceState {
   audioInputDeviceId: string;
@@ -141,25 +147,24 @@ export function Lobby({ roomId, displayName, role, onJoin, onCancel }: LobbyProp
   };
 
   return (
-    <main className="relative flex min-h-dvh justify-center bg-sc-bg px-6 py-12">
-      <div className="flex w-full max-w-[520px] flex-col gap-6">
-        <header className="flex flex-col gap-3">
-          <Logo size={56} wordmarkSize={36} surface="solid" />
-          <div className="flex flex-col gap-1">
-            <p className="t-meta uppercase text-sc-accent-700">Ready to join</p>
-            <h1 className="t-h1 text-sc-text">
-              Room <span className="font-mono">{roomId}</span>
-            </h1>
-            <p className="t-body-sm text-sc-text-2">
-              Joining as <span className="font-medium text-sc-text">{displayName}</span>
-              {" · "}
-              <span className="capitalize">{role}</span> role.
-            </p>
-          </div>
-        </header>
+    <PreflightShell
+      hero={<Logo size={72} wordmarkSize={44} surface="overlay" />}
+    >
+      <header className={preflightShell.pageHead}>
+        <h1>Ready to join</h1>
+        <p>
+          Joining room{" "}
+          <code className="font-mono text-sc-text">{roomId}</code> as{" "}
+          <span className="font-medium text-sc-text">{displayName}</span>
+          {" · "}
+          <span className="capitalize">{role}</span> role.
+        </p>
+      </header>
 
+      <section className="flex flex-col gap-2 pb-6">
+        <span className="t-label text-sc-text">Camera preview</span>
         <div className="relative">
-          <div className="sc-tile-placeholder relative aspect-[4/3] w-full overflow-hidden rounded-sc-2xl border border-sc-border shadow-sc-md">
+          <div className="sc-tile-placeholder relative aspect-[4/3] w-full overflow-hidden rounded-sc-lg border border-sc-border">
             <video
               ref={videoRef}
               className="absolute inset-0 size-full -scale-x-100 object-cover"
@@ -211,63 +216,77 @@ export function Lobby({ roomId, displayName, role, onJoin, onCancel }: LobbyProp
             </div>
           </div>
         </div>
+      </section>
 
-        <section className="mt-4 flex flex-col gap-4 rounded-sc-2xl border border-sc-border bg-sc-surface p-5 shadow-sc-sm">
-          <p className="t-meta uppercase text-sc-text-3">Devices</p>
-          <DevicePicker
-            kind="videoinput"
-            devices={videoInputs}
-            value={videoInputId}
-            onChange={setVideoInputId}
-          />
-          <DevicePicker
-            kind="audioinput"
-            devices={audioInputs}
-            value={audioInputId}
-            onChange={setAudioInputId}
-          />
-          <DevicePicker
-            kind="audiooutput"
-            devices={audioOutputs}
-            value={audioOutputId}
-            onChange={setAudioOutputId}
-          />
-          {error ? (
-            <p className="t-body-sm rounded-sc-md bg-sc-warning-subtle px-3 py-2 text-sc-warning">
-              {error}
-            </p>
-          ) : null}
-        </section>
+      <div className={rail} aria-hidden />
 
-        {role === "deaf" ? (
-          <section className="flex flex-col gap-3 rounded-sc-2xl border border-sc-border bg-sc-surface p-5 shadow-sc-sm">
-            <p className="t-body-sm text-sc-text-2">
-              Pick the voice the hearing participant hears when you sign. You
-              can change it later from in-call settings.
+      <fieldset className="m-0 flex flex-col gap-3 border-0 p-0 py-6">
+        <legend className="mb-2 block w-full px-0 t-label text-sc-text">
+          Devices
+        </legend>
+        <DevicePicker
+          kind="videoinput"
+          devices={videoInputs}
+          value={videoInputId}
+          onChange={setVideoInputId}
+        />
+        <DevicePicker
+          kind="audioinput"
+          devices={audioInputs}
+          value={audioInputId}
+          onChange={setAudioInputId}
+        />
+        <DevicePicker
+          kind="audiooutput"
+          devices={audioOutputs}
+          value={audioOutputId}
+          onChange={setAudioOutputId}
+        />
+        {error ? (
+          <p className="t-body-sm rounded-sc-md bg-sc-warning-subtle px-3 py-2 text-sc-warning">
+            {error}
+          </p>
+        ) : null}
+      </fieldset>
+
+      {role === "deaf" ? (
+        <>
+          <div className={rail} aria-hidden />
+          <fieldset className="m-0 flex flex-col gap-3 border-0 p-0 py-6">
+            <legend className="mb-2 block w-full px-0 t-label text-sc-text">
+              Voice
+            </legend>
+            <p className="t-meta text-sc-text-2">
+              Pick the voice the hearing participant hears when you sign.
+              You can change it later from in-call settings.
             </p>
             <VoicePicker />
-          </section>
-        ) : null}
+          </fieldset>
+        </>
+      ) : null}
 
+      <div className={rail} aria-hidden />
+
+      <div className="flex flex-col gap-3 pt-6">
         <button
           type="button"
           onClick={() => void handleJoin()}
           disabled={!ready || joining}
-          className="sc-luminous mt-2 inline-flex h-12 w-full items-center justify-center rounded-sc-full px-6 text-[15px] font-medium transition-[transform,filter] duration-200 hover:-translate-y-px hover:brightness-105 active:translate-y-0 disabled:opacity-40 disabled:pointer-events-none"
+          className="sc-luminous inline-flex h-12 w-full items-center justify-center rounded-sc-full px-6 text-[15px] font-medium transition-[transform,filter] duration-200 hover:-translate-y-px hover:brightness-105 active:translate-y-0 disabled:opacity-40 disabled:pointer-events-none"
         >
           {joining ? "Joining…" : "Join now"}
         </button>
-
-        <button
-          type="button"
-          onClick={onCancel}
-          className="inline-flex items-center justify-center gap-2 self-center rounded-sc-md px-3 py-2 t-label text-sc-text-3 transition-colors duration-150 hover:text-sc-text-2"
-        >
-          <ArrowLeft size={14} weight="bold" />
-          Back
-        </button>
       </div>
-    </main>
+
+      <button
+        type="button"
+        onClick={onCancel}
+        className="mt-auto inline-flex items-center justify-center gap-2 self-center rounded-sc-md px-3 pb-1 pt-8 t-label text-sc-text-3 transition-colors duration-150 hover:text-sc-text-2"
+      >
+        <ArrowLeft size={14} weight="bold" />
+        Back
+      </button>
+    </PreflightShell>
   );
 }
 

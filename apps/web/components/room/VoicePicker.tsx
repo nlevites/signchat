@@ -369,8 +369,7 @@ const LIGHT = {
   error: "border-sc-warning/40 bg-sc-warning-subtle text-sc-warning",
   errorButton: "border-sc-warning/40 text-sc-warning hover:bg-sc-warning/10",
   rowDefault: "border-sc-border bg-sc-surface hover:border-sc-border-strong",
-  rowSelected:
-    "border-sc-accent-500 bg-sc-accent-soft shadow-[var(--sc-glow-sm)]",
+  rowSelected: "border-sc-accent-500 bg-sc-accent-soft",
   radioOff: "border-sc-border-strong bg-sc-surface",
   radioOn: "border-sc-accent-500 bg-sc-accent-500",
   radioDot: "bg-white",
@@ -390,8 +389,7 @@ const DARK = {
   errorButton: "border-red-300/40 text-red-200 hover:bg-red-500/15",
   rowDefault:
     "border-white/15 bg-black/30 hover:border-white/30 hover:bg-black/40",
-  rowSelected:
-    "border-sc-accent-300 bg-sc-accent-500/15 shadow-[var(--sc-glow-sm)]",
+  rowSelected: "border-sc-accent-300 bg-sc-accent-500/15",
   radioOff: "border-white/40 bg-black/40",
   radioOn: "border-sc-accent-300 bg-sc-accent-500",
   radioDot: "bg-white",
