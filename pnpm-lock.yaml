@@ -62,6 +62,9 @@ importers:
       tailwind-merge:
         specifier: 3.5.0
         version: 3.5.0
+      zustand:
+        specifier: ^4.5.7
+        version: 4.5.7(@types/react@19.2.14)(react@19.2.5)
     devDependencies:
       '@tailwindcss/postcss':
         specifier: 4.2.2
@@ -1161,6 +1164,11 @@ packages:
   uri-js@4.4.1:
     resolution: {integrity: sha512-7rKUyy33Q1yc98pQ1DAmLtwX109F7TIfWlW1Ydo8Wl1ii1SeHieeh0HHfPeL2fMXK6z0s8ecKs9frCuLJvndBg==}
 
+  use-sync-external-store@1.6.0:
+    resolution: {integrity: sha512-Pp6GSwGP/NrPIrxVFAIkOQeyw8lFenOHijQWkUTrDvrF4ALqylP2C/KCkeS9dpUM3KvYRQhna5vt7IL95+ZQ9w==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
   which@2.0.2:
     resolution: {integrity: sha512-BLI3Tl1TW3Pvl70l3yq3Y64i+awpwXqsGBYWkkqMtnbXgrMD+yj7rhW0kuEDxzJaYXGjEW5ogapKNMEKNMjibA==}
     engines: {node: '>= 8'}
@@ -1176,6 +1184,21 @@ packages:
 
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+
+  zustand@4.5.7:
+    resolution: {integrity: sha512-CHOUy7mu3lbD6o6LJLfllpjkzhHXSBlX8B9+qPddUsIfeF5S/UZ5q0kmCsnRqT1UHFQZchNFDDzMbQsuesHWlw==}
+    engines: {node: '>=12.7.0'}
+    peerDependencies:
+      '@types/react': '>=16.8'
+      immer: '>=9.0.6'
+      react: '>=16.8'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      immer:
+        optional: true
+      react:
+        optional: true
 
 snapshots:
 
@@ -2106,6 +2129,10 @@ snapshots:
     dependencies:
       punycode: 2.3.1
 
+  use-sync-external-store@1.6.0(react@19.2.5):
+    dependencies:
+      react: 19.2.5
+
   which@2.0.2:
     dependencies:
       isexe: 2.0.0
@@ -2115,3 +2142,10 @@ snapshots:
   yocto-queue@0.1.0: {}
 
   zod@3.25.76: {}
+
+  zustand@4.5.7(@types/react@19.2.14)(react@19.2.5):
+    dependencies:
+      use-sync-external-store: 1.6.0(react@19.2.5)
+    optionalDependencies:
+      '@types/react': 19.2.14
+      react: 19.2.5
