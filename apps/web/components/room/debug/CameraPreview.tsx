@@ -14,8 +14,8 @@ interface Connection {
   end: number;
 }
 import { cn } from "@/lib/cn";
-import type { NormalizedLandmark } from "@/lib/sign-pipeline/landmark-assembly";
-import type { VisionFrame } from "@/lib/sign-pipeline/mediapipe-runner";
+import type { NormalizedLandmark } from "@signchat/runtime-browser/sign-pipeline/landmark-assembly";
+import type { VisionFrame } from "@signchat/runtime-browser/sign-pipeline/mediapipe-runner";
 
 export interface CameraPreviewProps {
   /** MediaStream from getUserMedia, typically supplied by MediaPipeOnnxClassifier. */

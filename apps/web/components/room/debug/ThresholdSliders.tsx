@@ -1,7 +1,7 @@
 "use client";
 
 import { type PreferenceThresholds, usePreferencesStore } from "@/lib/stores";
-import { ControllerStore } from "@/lib/mode-controller/controller-store";
+import { ControllerStore } from "@signchat/runtime-browser/mode-controller/controller-store";
 import { cn } from "@/lib/cn";
 
 type ThresholdKey = keyof PreferenceThresholds;

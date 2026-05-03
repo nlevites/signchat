@@ -1,0 +1,24 @@
+appId: org.signchat.bridge
+productName: Sign Chat Bridge
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**/*
+  - package.json
+mac:
+  category: public.app-category.utilities
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  extendInfo:
+    NSCameraUsageDescription: >-
+      Sign Chat Bridge needs camera access to capture your signing for
+      MediaPipe + ASL recognition.
+    NSMicrophoneUsageDescription: >-
+      Sign Chat Bridge needs microphone access so it can read the BlackHole
+      virtual loopback device and transcribe the call's incoming audio.

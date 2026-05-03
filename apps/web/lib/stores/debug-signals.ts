@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import type { ReconstructionPayload } from "@signchat/contracts";
 import type { ReconstructionModelId } from "@signchat/prompts";
-import type { ClassifierResult } from "@/lib/sign-pipeline/classifier";
-import type { VisionFrame } from "@/lib/sign-pipeline/mediapipe-runner";
+import type { ClassifierResult } from "@signchat/runtime-browser/sign-pipeline/classifier";
+import type { VisionFrame } from "@signchat/runtime-browser/sign-pipeline/mediapipe-runner";
 
 /** Lifecycle of the most-recent OpenRouter reconstruct call. */
 export type ReconstructPromptStatus = "pending" | "ok" | "error";

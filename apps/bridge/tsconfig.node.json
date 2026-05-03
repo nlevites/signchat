@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": true,
+    "rootDir": "./src",
+    "lib": ["ES2023"],
+    "types": ["node", "electron"],
+    "esModuleInterop": true,
+    "moduleResolution": "Bundler"
+  },
+  "include": [
+    "src/main/**/*.ts",
+    "src/preload/**/*.ts",
+    "electron-vite.config.ts",
+    "vite.renderer.config.ts"
+  ]
+}

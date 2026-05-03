@@ -19,10 +19,10 @@ export interface AutoThresholds {
 }
 
 export const DEFAULT_AUTO_THRESHOLDS: AutoThresholds = {
-  top1Threshold: 0.5,
-  top2Threshold: 0.3,
-  silenceMs: 2000,
-  inferenceIntervalMs: 500,
+  top1Threshold: 0.3,
+  top2Threshold: 0.1,
+  silenceMs: 500,
+  inferenceIntervalMs: 200,
   autoStartThreshold: 0.25,
   autoStopThreshold: 0.03,
 };

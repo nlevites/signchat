@@ -1,0 +1,46 @@
+{
+  "name": "@signchat/runtime-browser",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./logger": "./src/logger.ts",
+    "./diagnostics/mark": "./src/diagnostics/mark.ts",
+    "./audio/voice-mixer": "./src/audio/voice-mixer.ts",
+    "./audio/decode-pcm": "./src/audio/decode-pcm.ts",
+    "./sign-pipeline/classifier": "./src/sign-pipeline/classifier.ts",
+    "./sign-pipeline/landmark-assembly": "./src/sign-pipeline/landmark-assembly.ts",
+    "./sign-pipeline/labels": "./src/sign-pipeline/labels.ts",
+    "./sign-pipeline/onnx-session": "./src/sign-pipeline/onnx-session.ts",
+    "./sign-pipeline/mediapipe-runner": "./src/sign-pipeline/mediapipe-runner.ts",
+    "./sign-pipeline/mediapipe-onnx-classifier": "./src/sign-pipeline/mediapipe-onnx-classifier.ts",
+    "./sign-pipeline/scripted-classifier": "./src/sign-pipeline/scripted-classifier.ts",
+    "./sign-pipeline/model-cache": "./src/sign-pipeline/model-cache.ts",
+    "./sign-pipeline/mp-log-filter": "./src/sign-pipeline/mp-log-filter.ts",
+    "./elevenlabs/sanitize": "./src/elevenlabs/sanitize.ts",
+    "./elevenlabs/wss-client": "./src/elevenlabs/wss-client.ts",
+    "./elevenlabs/streaming": "./src/elevenlabs/streaming.ts",
+    "./elevenlabs/stt-streaming": "./src/elevenlabs/stt-streaming.ts",
+    "./openrouter/client": "./src/openrouter/client.ts",
+    "./mode-controller/mode-controller": "./src/mode-controller/mode-controller.ts",
+    "./mode-controller/controller-store": "./src/mode-controller/controller-store.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "echo '@signchat/runtime-browser: lint not configured yet'"
+  },
+  "dependencies": {
+    "@signchat/contracts": "workspace:*",
+    "@signchat/prompts": "workspace:*",
+    "@signchat/sign-pipeline": "workspace:*",
+    "@mediapipe/tasks-vision": "0.10.17"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0"
+  }
+}

@@ -23,19 +23,25 @@ import {
 import {
   acquireController,
   useModeSnapshot,
-} from "@/lib/mode-controller/controller-store";
-import type { ModeController } from "@/lib/mode-controller/mode-controller";
-import { MediaPipeOnnxClassifier } from "@/lib/sign-pipeline/mediapipe-onnx-classifier";
-import { reconstruct } from "@/lib/openrouter/client";
+} from "@signchat/runtime-browser/mode-controller/controller-store";
+import type { ModeController } from "@signchat/runtime-browser/mode-controller/mode-controller";
+import { MediaPipeOnnxClassifier } from "@signchat/runtime-browser/sign-pipeline/mediapipe-onnx-classifier";
+import { reconstruct } from "@signchat/runtime-browser/openrouter/client";
 import {
   createVoiceMixer,
   type VoiceMixer,
-} from "@/lib/audio/voice-mixer";
-import { openTurnWss, speak } from "@/lib/elevenlabs/streaming";
+} from "@signchat/runtime-browser/audio/voice-mixer";
+import {
+  openTurnWss,
+  speak,
+} from "@signchat/runtime-browser/elevenlabs/streaming";
 import {
   createSttStream,
   type SttStream,
-} from "@/lib/elevenlabs/stt-streaming";
+  type SttPartialEvent,
+  type SttFinalEvent,
+} from "@signchat/runtime-browser/elevenlabs/stt-streaming";
+import "@/lib/diagnostics/runtime-bridge";
 import { broadcastCaption } from "@/lib/livekit/caption-broadcast";
 import { mintElevenLabsSignedUrl } from "@/lib/livekit/mint-elevenlabs";
 import { mintElevenLabsSttSignedUrl } from "@/lib/livekit/mint-elevenlabs-stt";
@@ -275,11 +281,57 @@ export function DeafSession({
         return;
       }
       if (cancelled) return;
+      const audioStream = new MediaStream([remoteAudioTrack.mediaStreamTrack]);
       const stream = createSttStream({
         signedUrl,
-        remoteAudioTrack,
+        audioStream,
         speaker,
-        publish: (msg) => publishRef.current(msg),
+        onPartial: (event: SttPartialEvent) => {
+          useTranscriptStore.getState().upsertPartial(event.utteranceId, {
+            from: event.speaker,
+            text: event.text,
+            ts: event.ts,
+          });
+          void publishRef
+            .current({
+              v: 1,
+              kind: "transcript_partial",
+              id: event.utteranceId,
+              ts: event.ts,
+              from: event.speaker,
+              text: event.text,
+            })
+            .catch((err) => {
+              LogBus.warn("deaf-session", "transcript_partial publish failed", {
+                error: err instanceof Error ? err.message : String(err),
+                id: event.utteranceId,
+              });
+            });
+        },
+        onFinal: (event: SttFinalEvent) => {
+          const msg: RoomDataMessage = {
+            v: 1,
+            kind: "transcript_final",
+            id: event.utteranceId,
+            ts: event.ts,
+            from: event.speaker,
+            text: event.text,
+          };
+          const store = useTranscriptStore.getState();
+          store.appendMessage(msg);
+          store.finalizePartial(event.utteranceId);
+          void publishRef.current(msg).catch((err) => {
+            LogBus.warn("deaf-session", "transcript_final publish failed", {
+              error: err instanceof Error ? err.message : String(err),
+              id: event.utteranceId,
+            });
+          });
+        },
+        onError: (event) => {
+          if (event.fatal) {
+            toast.error("Captions unavailable");
+          }
+        },
       });
       started = stream;
       sttStreamRef.current = stream;

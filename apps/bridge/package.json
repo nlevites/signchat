@@ -1,0 +1,39 @@
+{
+  "name": "@signchat/bridge",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Sign Chat Bridge — Electron app that runs the signchat pipeline against your webcam, sends synthesised voice to a BlackHole virtual mic, and captures the call's speaker audio for transcription.",
+  "main": "dist/main/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "package": "electron-vite build && electron-builder --mac --config electron-builder.yml",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "lint": "echo '@signchat/bridge: lint not configured yet'"
+  },
+  "dependencies": {
+    "@phosphor-icons/react": "2.1.10",
+    "@signchat/contracts": "workspace:*",
+    "@signchat/prompts": "workspace:*",
+    "@signchat/runtime-browser": "workspace:*",
+    "@signchat/sign-pipeline": "workspace:*",
+    "clsx": "2.1.1",
+    "react": "19.2.5",
+    "react-dom": "19.2.5",
+    "tailwind-merge": "3.5.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.2.2",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.0",
+    "electron-vite": "^4.0.0",
+    "tailwindcss": "4.2.2",
+    "vite": "^7.0.0"
+  }
+}

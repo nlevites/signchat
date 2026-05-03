@@ -31,7 +31,7 @@ import { useLiveKitRoom } from "@/lib/livekit/room";
 import {
   ControllerStore,
   useModeSnapshot,
-} from "@/lib/mode-controller/controller-store";
+} from "@signchat/runtime-browser/mode-controller/controller-store";
 import {
   usePreferencesStore,
   useRoomStore,

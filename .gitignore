@@ -9,6 +9,7 @@ out/
 # build output
 dist/
 build/
+release/
 *.tsbuildinfo
 
 # turbopack / vercel

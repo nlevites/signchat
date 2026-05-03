@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/cn";
-import type { ClassifierResult } from "@/lib/sign-pipeline/classifier";
+import type { ClassifierResult } from "@signchat/runtime-browser/sign-pipeline/classifier";
 
 export interface TopKBarsProps {
   result: ClassifierResult | null;
