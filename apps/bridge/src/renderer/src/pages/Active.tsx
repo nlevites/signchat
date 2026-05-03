@@ -52,6 +52,15 @@ const HEARING_PARTICIPANT: ParticipantInfo = {
   role: "hearing",
 };
 
+/**
+ * Reconstruction model the Bridge always uses, regardless of the modelId
+ * the server-minted OpenRouter session key reports. Keep this aligned with
+ * the web default so Bridge and web demos produce comparable reconstructions.
+ * The OpenRouter session key is model-agnostic and the credit cap applies to
+ * whichever model we pick here.
+ */
+const BRIDGE_MODEL_ID: ReconstructionModelId = "google/gemini-3-flash-preview";
+
 export function Active(props: ActiveProps): JSX.Element {
   const {
     cameraDeviceId,
@@ -215,8 +224,7 @@ export function Active(props: ActiveProps): JSX.Element {
     }
 
     const apiKey = credentials.openRouterApiKey;
-    const modelId = (credentials.openRouterModelId ??
-      "openai/gpt-5.4-mini") as ReconstructionModelId;
+    const modelId = BRIDGE_MODEL_ID;
     const tokens = controller.snapshot().buffer.tokens;
     const topK = tokens.map((tok) => ({
       word: tok.label,
@@ -447,7 +455,7 @@ export function Active(props: ActiveProps): JSX.Element {
       <Footer
         micOutputDeviceId={micOutputDeviceId}
         loopbackInputDeviceId={loopbackInputDeviceId}
-        modelId={credentials.openRouterModelId}
+        modelId={BRIDGE_MODEL_ID}
         lastTtsLatencyMs={lastTtsLatencyMs}
         lastReconstructLatencyMs={lastReconstructLatencyMs}
         onReconfigure={onReconfigure}

@@ -45,7 +45,7 @@ const DEFAULT_THRESHOLDS: PreferenceThresholds = {
 export const usePreferencesStore = create<PreferencesState>()(
   persist(
     (set) => ({
-      modelId: "openai/gpt-5.4-mini",
+      modelId: "google/gemini-3-flash-preview",
       mode: "auto",
       thresholds: { ...DEFAULT_THRESHOLDS },
       lastDevices: {
@@ -66,7 +66,7 @@ export const usePreferencesStore = create<PreferencesState>()(
     }),
     {
       name: "signchat:preferences",
-      version: 6,
+      version: 7,
       // v1 → v2: backfill the new auto-mode thresholds with defaults so
       // returning users don't end up with undefined fields driving the
       // confidence-streak detection.
@@ -83,6 +83,9 @@ export const usePreferencesStore = create<PreferencesState>()(
       // responsive baseline (lower top-k, shorter silence/interval).
       // Force-migrate everyone — their previously tuned values are
       // discarded so dashboards reflect the new shipped baseline.
+      // v6 → v7: move the web reconstruction default back to Gemini Flash,
+      // matching Bridge. Existing users still on the previous auto-assigned
+      // default are migrated; other explicit model choices are preserved.
       migrate: (persisted, version) => {
         if (!persisted || typeof persisted !== "object") {
           return persisted as PreferencesState;
@@ -120,6 +123,11 @@ export const usePreferencesStore = create<PreferencesState>()(
         }
         if (version < 6) {
           s = { ...s, thresholds: { ...DEFAULT_THRESHOLDS } };
+        }
+        if (version < 7) {
+          if (s.modelId === "openai/gpt-5.4-mini") {
+            s = { ...s, modelId: "google/gemini-3-flash-preview" };
+          }
         }
         return s as PreferencesState;
       },

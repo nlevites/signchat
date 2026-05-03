@@ -14,11 +14,10 @@ import { enforceRateLimit } from "@/lib/api/rate-limit";
 
 export const dynamic = "force-dynamic";
 
-// 5 credits ≈ 1-2k reconstruction turns at openai/gpt-5.4-mini's
-// ~$0.25/M input, $2/M output pricing — the new default per
-// prompt-tester sweep results.
+// 5 credits comfortably covers a demo room; the OpenRouter session key is
+// model-agnostic and the client defaults to Gemini Flash for reconstruction.
 const SESSION_KEY_LIMIT_CREDITS = 5;
-const DEFAULT_MODEL_ID = "openai/gpt-5.4-mini" as const;
+const DEFAULT_MODEL_ID = "google/gemini-3-flash-preview" as const;
 
 function getClientIp(req: Request): string {
   const fwd = req.headers.get("x-forwarded-for");

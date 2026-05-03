@@ -17,8 +17,8 @@ const OPENROUTER_OPTIONS: ReadonlyArray<{
   value: ReconstructionModelId;
   label: string;
 }> = [
-  { value: "openai/gpt-5.4-mini", label: "openai/gpt-5.4-mini (default)" },
-  { value: "google/gemini-3-flash-preview", label: "google/gemini-3-flash-preview" },
+  { value: "google/gemini-3-flash-preview", label: "google/gemini-3-flash-preview (default)" },
+  { value: "openai/gpt-5.4-mini", label: "openai/gpt-5.4-mini" },
   { value: "anthropic/claude-haiku-4.5", label: "anthropic/claude-haiku-4.5" },
   { value: "x-ai/grok-4.1-fast", label: "x-ai/grok-4.1-fast" },
 ];

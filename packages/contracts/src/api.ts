@@ -27,7 +27,7 @@ export interface CreateOpenRouterSessionKeyResponse {
   keyHash: string;
   label: string;
   limitCredits: number;
-  modelId: "openai/gpt-5.4-mini";
+  modelId: "google/gemini-3-flash-preview";
   createdAt: string;
 }
 
