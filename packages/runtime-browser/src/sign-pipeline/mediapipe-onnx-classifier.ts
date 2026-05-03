@@ -93,6 +93,14 @@ export interface MediaPipeOnnxClassifierOptions {
    * via getUserMedia would conflict with LiveKit's track ownership).
    */
   stream?: MediaStream;
+  /**
+   * Sign labels to suppress from results. Their softmax probabilities are
+   * zeroed before top-K so they never appear in ClassifierResult.top and
+   * never reach the admit/mode-controller pipeline. Unknown labels are
+   * silently ignored (logged once at start). Case-sensitive — must match
+   * the JSON keys in sign_to_prediction_index_map.json exactly.
+   */
+  blockedLabels?: Iterable<string>;
 }
 
 const DEFAULT_VIDEO_CONSTRAINTS: MediaTrackConstraints = {
@@ -117,6 +125,11 @@ export class MediaPipeOnnxClassifier implements Classifier {
   private runner: VisionRunner | null = null;
   private session: OrtInferenceSession | null = null;
   private labels: SignLabels | null = null;
+  /**
+   * Indices into the model's output vector that should be masked out
+   * before top-K. Resolved from `options.blockedLabels` once labels load.
+   */
+  private blockedIndices: ReadonlyArray<number> = [];
   private inferTimer: ReturnType<typeof setInterval> | null = null;
   private rafId: number | null = null;
   private vfcId: number | null = null;
@@ -170,6 +183,7 @@ export class MediaPipeOnnxClassifier implements Classifier {
         this.openCamera(),
       ]);
       this.labels = labels;
+      this.blockedIndices = this.resolveBlockedIndices(labels);
       this.session = session;
       this.runner = runner;
       this.stream = stream;
@@ -250,6 +264,28 @@ export class MediaPipeOnnxClassifier implements Classifier {
 
   private async loadLabels(): Promise<SignLabels> {
     return fetchSignLabels(this.options.labelsUrl ?? LABELS_URL);
+  }
+
+  private resolveBlockedIndices(labels: SignLabels): ReadonlyArray<number> {
+    const requested = this.options.blockedLabels;
+    if (!requested) return [];
+    const resolved: number[] = [];
+    const missing: string[] = [];
+    for (const name of requested) {
+      const idx = labels.signToIndex[name];
+      if (typeof idx === "number") resolved.push(idx);
+      else missing.push(name);
+    }
+    if (resolved.length > 0) {
+      log.info("classifier", "blocking labels from top-K", {
+        labels: Array.from(requested),
+        resolvedIndices: resolved,
+      });
+    }
+    if (missing.length > 0) {
+      log.warn("classifier", "blockedLabels included unknown names", { missing });
+    }
+    return resolved;
   }
 
   private async loadSession(): Promise<OrtInferenceSession> {
@@ -389,6 +425,13 @@ export class MediaPipeOnnxClassifier implements Classifier {
       const logits = logitsTensor.data;
       mark("ort.topk", probeId, "start");
       const probs = softmax(logits);
+      // Mask blocked classes so they cannot win top-K. Zeroing the post-softmax
+      // probability is sufficient for argmax-style ranking; we deliberately do
+      // not renormalise the remaining mass since downstream consumers
+      // (admit, mode controller) compare against absolute thresholds.
+      for (const idx of this.blockedIndices) {
+        if (idx < probs.length) probs[idx] = 0;
+      }
       const top = computeTopK(probs, this.labels.indexToLabel, this.cfg.topK);
       mark("ort.topk", probeId, "end");
 

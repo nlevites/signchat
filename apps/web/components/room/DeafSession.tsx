@@ -77,6 +77,16 @@ import { InlinePreview } from "@/components/room/InlinePreview";
 
 const REMINT_THRESHOLD_MS = 30_000;
 
+/**
+ * Sign labels that the classifier must never surface in its top-K result.
+ * Their post-softmax probabilities are zeroed before ranking so they cannot
+ * win, regardless of model confidence. Names must match the JSON keys in
+ * apps/web/public/models/asl-signs/sign_to_prediction_index_map.json
+ * exactly (case-sensitive). Add new entries here only after confirming the
+ * label is present in the vocabulary.
+ */
+const BLOCKED_SIGN_LABELS = new Set<string>(["giraffe", "drop"]);
+
 export interface DeafSessionProps {
   room: Room | null;
   localVideoTrack: LocalVideoTrack | null;
@@ -205,6 +215,7 @@ export function DeafSession({
     const cls = new MediaPipeOnnxClassifier({
       config: { inferenceIntervalMs: prefs.thresholds.intervalMs },
       stream,
+      blockedLabels: BLOCKED_SIGN_LABELS,
       onFrame: (frame) => useDebugSignalsStore.getState().setLatestFrame(frame),
     });
     const offResult = cls.onResult((result) => {

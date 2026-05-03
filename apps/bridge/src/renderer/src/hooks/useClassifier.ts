@@ -7,6 +7,15 @@ import type {
 } from "@signchat/runtime-browser/sign-pipeline/classifier";
 import type { VisionFrame } from "@signchat/runtime-browser/sign-pipeline/mediapipe-runner";
 
+/**
+ * Sign labels that the classifier must never surface in its top-K result.
+ * Mirrors the list in apps/web/components/room/DeafSession.tsx so Bridge
+ * and the web app behave identically. Names must match the JSON keys in
+ * apps/web/public/models/asl-signs/sign_to_prediction_index_map.json
+ * exactly (case-sensitive).
+ */
+const BLOCKED_SIGN_LABELS = new Set<string>(["giraffe", "drop"]);
+
 export interface UseClassifierOptions {
   cameraDeviceId: string;
   /**
@@ -81,6 +90,7 @@ export function useClassifier(
           stream: fresh,
           modelUrl: `${trimmedOrigin}/models/asl-signs/asl-signs.onnx`,
           labelsUrl: `${trimmedOrigin}/models/asl-signs/sign_to_prediction_index_map.json`,
+          blockedLabels: BLOCKED_SIGN_LABELS,
           onFrame: (frame) => onFrameRef.current(frame),
         });
         classifier.onResult((result) => onResultRef.current(result));
