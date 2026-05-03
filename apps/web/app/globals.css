@@ -1,6 +1,7 @@
 /* signchat design system — single source of truth.
  * surfaces, accent, motion, recipes. all token values commented.
- * comments explain WHEN to use each token, not what the value is. */
+ * comments explain WHEN to use each token, not what the value is.
+ * landing layout + hero/header contracts: apps/web/DESIGN_SYSTEM.md */
 
 @import "tailwindcss";
 
@@ -8,62 +9,69 @@
  * 1. raw tokens — `:root`. used in css recipes + inline styles.
  * ===================================================================== */
 :root {
-  /* ---- surfaces (cool near-white) ---- */
-  --sc-bg: #f6f7fb;          /* page background — used on body, /start, /room light areas */
-  --sc-surface: #ffffff;     /* lifted card surface — start card, chat panel, modal */
-  --sc-surface-2: #eef0f6;   /* sunken row tint — selected list row, video-stage gutter */
-  --sc-surface-3: #e5e8f1;   /* deeper sunken — debug panel inner shading */
-  --sc-border: #e3e6ef;      /* default 1px hairline */
-  --sc-border-strong: #cdd1de; /* hover-state border, focused-input border */
-  --sc-divider: #eceef5;     /* horizontal rules, panel splits */
+  /* ---- surfaces (warm near-white, plum-neutral — aligns with landing parchment rails). ---- */
+  --sc-bg: #f7f5fa;          /* page background — body, /start, /room light areas */
+  --sc-surface: #ffffff;     /* lifted card surface — chat panel, modal */
+  --sc-surface-2: #f0ecf7;   /* sunken row tint — selected list row, video gutter */
+  --sc-surface-3: #e8e2f0;   /* deeper sunken — debug inner shading */
+  --sc-border: #e4dde8;      /* default 1px hairline */
+  --sc-border-strong: #cfc6d8; /* hover border, focused-input border */
+  --sc-divider: #efeaf5;     /* horizontal rules, panel splits */
 
-  /* ---- text (cool near-black) ---- */
-  --sc-text: #121422;        /* body text, headings */
-  --sc-text-2: #474b5c;      /* secondary copy, paragraph captions */
-  --sc-text-3: #858a9b;      /* meta, placeholders, muted "back" buttons */
-  --sc-text-inverse: #f8f9fc; /* text on accent / dark surfaces */
+  /* ---- text (neutral with slight plum bias — not icy blue-gray). ---- */
+  --sc-text: #17141f;        /* body text, headings */
+  --sc-text-2: #4a4558;      /* secondary copy, captions */
+  --sc-text-3: #7d7789;      /* meta, placeholders */
+  --sc-text-inverse: #f8f7fc; /* text on accent / dark fills */
 
-  /* ---- accent — luminous periwinkle. brand color of the app. ---- */
-  --sc-accent-300: #bcbef9;  /* lavender highlight, pill rim, on-dark text accent */
-  --sc-accent-400: #9294f4;  /* soft periwinkle — indicator dots, non-text emphasis */
-  --sc-accent-500: #7578f0;  /* MAIN — focus rings, brand mark, links, AA */
-  --sc-accent-600: #6063e6;  /* primary fill — gradient base. AA white text */
-  --sc-accent-700: #4f52d0;  /* primary hover. selected text on soft wash */
-  --sc-accent-800: #4043b4;  /* pressed / deep gradient stop */
+  /* ---- accent — violet / iris family (same lane as `--sh-color-iris`, hero CTA purples). ---- */
+  --sc-accent-300: #cdb8ef;  /* lavender highlight, rim glow on dark */
+  --sc-accent-400: #a884e5;  /* soft violet — dots, non-text emphasis */
+  --sc-accent-500: #8b5fd6;  /* MAIN — focus rings, links (AA on white body) */
+  --sc-accent-600: #7646c7;  /* primary gradient anchor — AA white text on fill */
+  --sc-accent-700: #6339ae;  /* hover / pressed shift */
+  --sc-accent-800: #4f2d8f;  /* deep gradient stop */
 
-  --sc-accent-soft:    #eeeffe; /* selected-row wash, hover tint */
-  --sc-accent-soft-2:  #e2e3fc; /* deeper wash */
-  --sc-accent-rim:     rgba(255, 255, 255, 0.32);  /* inner glossy highlight on filled accent */
-  --sc-accent-glow:    rgba(117, 120, 240, 0.35);  /* halo */
-  --sc-accent-glow-soft: rgba(117, 120, 240, 0.18);
+  --sc-accent-soft:    #f4f0fc; /* selected-row wash */
+  --sc-accent-soft-2:  #eae4f8; /* deeper wash */
+  --sc-accent-rim:     rgba(255, 255, 255, 0.32);  /* inner highlight on filled accent */
+  --sc-accent-glow:    rgba(118, 70, 199, 0.34);  /* halo — pairs with --sc-accent-600 hue */
+  --sc-accent-glow-soft: rgba(118, 70, 199, 0.17);
 
-  /* gradients — `135deg` diagonal for fills, `180deg` vertical for atmospheric blooms */
-  --sc-accent-gradient: linear-gradient(135deg, #6063e6 0%, #5457d8 52%, #4346c0 100%);
-  --sc-accent-gradient-soft: linear-gradient(180deg, rgba(146, 148, 244, 0.22) 0%, rgba(96, 99, 230, 0.12) 100%);
-  /* deep variant — only on FeatureCard. darker enclosure for white copy. */
-  --sc-accent-gradient-deep: linear-gradient(135deg, #5457d8 0%, #4043b4 55%, #2e3096 100%);
+  /* gradients — diagonal fills; blooms lean violet (landing-aligned, not blue-periwinkle). */
+  --sc-accent-gradient: linear-gradient(135deg, #804fd4 0%, #6d3fc0 50%, #59349e 100%);
+  --sc-accent-gradient-soft: linear-gradient(180deg, rgba(176, 146, 238, 0.24) 0%, rgba(118, 70, 199, 0.12) 100%);
+  /* deep variant — marketing / feature enclosures only. */
+  --sc-accent-gradient-deep: linear-gradient(135deg, #6d3fc0 0%, #4f2d8f 58%, #3a2168 100%);
 
-  /* ---- hero field — single atmospheric gradient. used on landing only.
-   * top 75% is deep periwinkle; bottom 25% fades to --sc-bg.
+  /* ---- hero field — atmospheric plum-violet stack + fade to --sc-bg.
    * pair with `.sc-hero-field` recipe so children render above the fade safety net. ---- */
-  --sc-hero-deep: #0e1133;
-  --sc-hero-mid: #1f2f8c;
-  --sc-hero-bloom: rgba(146, 148, 244, 0.55);
+  --sc-hero-deep: #120d1f;
+  --sc-hero-mid: #453066;
+  --sc-hero-bloom: rgba(176, 146, 238, 0.52);
   --sc-hero-fade: var(--sc-bg);
   --sc-hero-gradient:
-    radial-gradient(110% 60% at 50% 20%, rgba(146, 148, 244, 0.55) 0%, rgba(96, 99, 230, 0) 60%),
-    radial-gradient(85% 45% at 50% 68%, rgba(146, 148, 244, 0.20) 0%, rgba(96, 99, 230, 0) 65%),
+    radial-gradient(110% 60% at 50% 20%, rgba(176, 146, 238, 0.50) 0%, rgba(72, 48, 118, 0) 60%),
+    radial-gradient(85% 45% at 50% 68%, rgba(176, 146, 238, 0.18) 0%, rgba(72, 48, 118, 0) 65%),
     linear-gradient(180deg,
-      #0e1133 0%, #161a55 18%, #1f2569 35%, #252b82 50%,
-      #2e37a0 62%, #3f49b0 75%, #6e78c2 85%, #a9b0da 93%,
-      #d4d8e9 97%, var(--sc-bg) 100%
+      #120d1f 0%, #1a1332 18%, #261d42 35%, #342456 50%,
+      #453066 62%, #5a4080 75%, #8060a8 85%, #bba3d4 93%,
+      #e8e2ef 97%, var(--sc-bg) 100%
     );
 
-  /* ---- footer — same hue family as the hero, just deeper.
-   * use `.sc-footer-surface` recipe. ---- */
+  /* ---- banner — midnight plum + soft violet bloom (white type + Logo overlay). ---- */
+  --sc-banner-gradient:
+    radial-gradient(80% 60% at 50% 0%, rgba(176, 146, 238, 0.11) 0%, rgba(0, 0, 0, 0) 60%),
+    linear-gradient(180deg, var(--sc-hero-deep) 0%, #0c0818 58%, #06040f 100%);
+
+  /* ---- footer — dark violet radial atmosphere (center glow → midnight edges).
+   * white copy + Logo overlay. animation lives in footer.module.css ::before. ---- */
   --sc-footer-gradient:
-    radial-gradient(80% 60% at 50% 0%, rgba(146, 148, 244, 0.10) 0%, rgba(0, 0, 0, 0) 60%),
-    linear-gradient(180deg, var(--sc-hero-deep) 0%, #090b22 60%, #06081a 100%);
+    radial-gradient(ellipse 55% 48% at 50% 28%, rgba(95, 72, 135, 0.42) 0%, transparent 62%),
+    radial-gradient(ellipse 70% 55% at 78% 92%, rgba(18, 10, 35, 0.95) 0%, transparent 58%),
+    radial-gradient(ellipse 65% 50% at 15% 88%, rgba(55, 38, 92, 0.55) 0%, transparent 55%),
+    radial-gradient(ellipse 100% 80% at 50% 100%, #030208 0%, transparent 72%),
+    linear-gradient(178deg, #151024 0%, #0a0714 38%, #040208 100%);
 
   /* ---- status (cool-leaning) ---- */
   --sc-success: #17a573;
@@ -98,17 +106,17 @@
   --sc-radius-2xl: 32px;     /* /start card, hero callout */
   --sc-radius-full: 999px;   /* pill button, badge, avatar */
 
-  /* ---- shadows — soft, cool-tinted ---- */
+  /* ---- shadows — soft neutral (no blue bias). ---- */
   --sc-shadow-xs: 0 1px 2px rgba(20, 22, 38, 0.04);
   --sc-shadow-sm: 0 2px 6px rgba(20, 22, 38, 0.06), 0 1px 2px rgba(20, 22, 38, 0.04);
   --sc-shadow-md: 0 8px 24px rgba(20, 22, 38, 0.07), 0 2px 6px rgba(20, 22, 38, 0.04);
   --sc-shadow-lg: 0 20px 50px rgba(20, 22, 38, 0.10), 0 6px 16px rgba(20, 22, 38, 0.06);
   --sc-shadow-xl: 0 32px 80px rgba(20, 22, 38, 0.14), 0 12px 30px rgba(20, 22, 38, 0.08);
 
-  /* ---- accent glows — separate from neutral shadows ---- */
-  --sc-glow-sm: 0 0 0 4px rgba(117, 120, 240, 0.16);   /* selected RoleCard, focus halo */
-  --sc-glow-md: 0 8px 24px rgba(117, 120, 240, 0.28), 0 0 0 4px rgba(117, 120, 240, 0.14);
-  --sc-glow-lg: 0 16px 40px rgba(117, 120, 240, 0.32), 0 0 0 6px rgba(117, 120, 240, 0.16);
+  /* ---- accent glows — violet halos (same family as --sc-accent-600). ---- */
+  --sc-glow-sm: 0 0 0 4px rgba(118, 70, 199, 0.17);   /* selected RoleCard, focus halo */
+  --sc-glow-md: 0 8px 24px rgba(118, 70, 199, 0.28), 0 0 0 4px rgba(118, 70, 199, 0.14);
+  --sc-glow-lg: 0 16px 40px rgba(118, 70, 199, 0.30), 0 0 0 6px rgba(118, 70, 199, 0.15);
 
   /* ---- glass — used selectively (control bar, scrolled nav, chat-rail wash) ---- */
   --sc-glass-bg: rgba(255, 255, 255, 0.68);
@@ -207,7 +215,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* focus — periwinkle outline always visible. NEVER strip outline without replacement. */
+/* focus — violet accent outline always visible. NEVER strip outline without replacement. */
 *:focus-visible {
   outline: 2px solid var(--sc-focus);
   outline-offset: 2px;
@@ -240,18 +248,41 @@ body {
   box-shadow: var(--sc-glass-shadow);
 }
 
-/* luminous — primary button fill. periwinkle gradient + inner rim + outer halo.
- * hover: brightness +2%; active: brightness -5%. handled inline by the button class. */
+/* luminous — primary CTA fill. violet gradient + rim + iris-tinted halo (landing-aligned).
+ * pair with Tailwind hover:-translate-y-px / brightness on buttons for motion. */
 .sc-luminous {
   background: var(--sc-accent-gradient);
   color: var(--sc-text-inverse);
+  transition:
+    filter var(--sc-dur-short) var(--sc-ease-standard),
+    transform var(--sc-dur-short) var(--sc-ease-standard),
+    box-shadow var(--sc-dur-short) var(--sc-ease-standard);
   box-shadow:
     inset 0 1px 0 var(--sc-accent-rim),
-    0 10px 30px rgba(96, 99, 230, 0.30),
-    0 0 0 1px rgba(96, 99, 230, 0.18);
+    0 10px 30px rgba(118, 70, 199, 0.30),
+    0 0 0 1px rgba(118, 70, 199, 0.22);
 }
 
-/* feature card — deep periwinkle enclosure with rim highlight + radial wash.
+/* secondary outline — hairline border; hover lifts violet ring (suite head CTA gesture). */
+.sc-btn-secondary {
+  border: 1px solid var(--sc-border);
+  background: var(--sc-surface);
+  color: var(--sc-text);
+  transition:
+    border-color var(--sc-dur-micro) ease,
+    box-shadow var(--sc-dur-short) var(--sc-ease-standard),
+    transform var(--sc-dur-short) var(--sc-ease-standard),
+    background-color var(--sc-dur-micro) ease;
+}
+.sc-btn-secondary:hover:not(:disabled) {
+  border-color: var(--sc-accent-600);
+  box-shadow: var(--sc-shadow-sm), 0 0 0 1px rgba(118, 70, 199, 0.14);
+}
+.sc-btn-secondary:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* feature card — deep violet enclosure + rim + radial wash.
  * marketing-only. NOT for read-heavy panels. */
 .sc-feature-card {
   position: relative;
@@ -283,7 +314,7 @@ body {
   bottom: -1px;
   height: 96px;
   pointer-events: none;
-  background: linear-gradient(180deg, rgba(246, 247, 251, 0) 0%, var(--sc-bg) 100%);
+  background: linear-gradient(180deg, rgba(247, 245, 250, 0) 0%, var(--sc-bg) 100%);
   z-index: 1;
 }
 .sc-hero-field > * { position: relative; z-index: 2; }
@@ -291,8 +322,43 @@ body {
 /* footer — deepest atmospheric block. anchors page bottom. */
 .sc-footer-surface { background: var(--sc-footer-gradient); color: var(--sc-text-inverse); }
 
-/* video tile placeholder — neutral cool gradient, reads as "camera feed off". */
-.sc-tile-placeholder { background: linear-gradient(135deg, #e6e8f0 0%, #d4d8e4 100%); }
+/* branded frame — continuous hatched rails on left/right that span the
+ * integrations band + the signchat-suite section. rails are positioned
+ * just outside the 1200px content max-width so they bookend the cell
+ * grid rather than the viewport. on viewports < 1256, they clamp to
+ * the viewport edges. inner-side 1px borders connect with the cells'
+ * top/bottom borders to read as one continuous orthogonal line system. */
+.sc-branded-frame {
+  position: relative;
+  background: #ffffff;
+  isolation: isolate;
+}
+.sc-branded-frame::before,
+.sc-branded-frame::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 28px;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    #d8d3cd 0 1px,
+    transparent 1px 7px
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+.sc-branded-frame::before {
+  left: max(0px, calc(50% - 628px));
+  border-right: 1px solid #e3e3e2;
+}
+.sc-branded-frame::after {
+  right: max(0px, calc(50% - 628px));
+  border-left: 1px solid #e3e3e2;
+}
+
+/* video tile placeholder — muted violet-gray, reads as "camera feed off". */
+.sc-tile-placeholder { background: linear-gradient(135deg, #ebe6f2 0%, #dcd4e8 100%); }
 
 /* =====================================================================
  * 6. keyframes
@@ -335,3 +401,67 @@ body {
   }
   .sc-signing-border { animation: none !important; }
 }
+
+/* =====================================================================
+ * 8. hero header (--sh-*) — Superhuman-derived cinematic hero system.
+ *    namespaced separately from the app design system (--sc-*) so they
+ *    never collide. consumed only by components/landing/HeroHeader/*.
+ * ===================================================================== */
+:root {
+  --sh-color-ink: #292827;
+  --sh-color-bone: #ffffff;
+  --sh-color-iris: #714cb6;
+  --sh-color-indigo-glow: #353088;
+  --sh-color-lavender-chip: #d4c7ff;
+  --sh-color-aubergine: #421d24;
+
+  --sh-gradient-hero-dusk:
+    linear-gradient(to left bottom,
+      rgba(168, 164, 216, 0.5),
+      rgba(107, 165, 232, 0.5),
+      rgba(176, 112, 192, 0.6),
+      rgba(144, 136, 208, 0.5)),
+    linear-gradient(rgb(124, 154, 211), rgb(49, 70, 130));
+
+  --sh-gradient-glass:
+    linear-gradient(210deg, rgba(255, 255, 255, 0.15), rgba(0, 0, 0, 0) 30%),
+    linear-gradient(rgba(31, 27, 90, 0.3), rgba(31, 27, 90, 0.2));
+
+  --sh-shadow-cta: rgba(14, 18, 27, 0.24) 0 1px 2px 0;
+  --sh-shadow-cta-hover:
+    rgba(14, 18, 27, 0.24) 0 1px 2px 0,
+    rgb(53, 48, 136) 0 0 0 1px;
+  --sh-shadow-cta-focus:
+    rgba(14, 18, 27, 0.24) 0 1px 2px 0,
+    rgb(113, 76, 182) 0 0 0 1px inset;
+
+  --sh-motion-base: 200ms;
+  --sh-motion-easing: cubic-bezier(0.25, 0.1, 0.25, 1.0);
+}
+
+/* CTA icon orbit — animate spotlight positions via @property custom props.
+ * graceful: browsers without @property hold the initial-value (still pretty).
+ * @property declarations live here because they're global by spec; the
+ * matching @keyframes live inside the css module so postcss-modules can
+ * transform their names in lockstep with the consumers. */
+@property --sh-spot1-x { syntax: '<percentage>'; inherits: false; initial-value: 68%; }
+@property --sh-spot1-y { syntax: '<percentage>'; inherits: false; initial-value: 50%; }
+@property --sh-spot2-x { syntax: '<percentage>'; inherits: false; initial-value: 50%; }
+@property --sh-spot2-y { syntax: '<percentage>'; inherits: false; initial-value: 98%; }
+@property --sh-spot3-x { syntax: '<percentage>'; inherits: false; initial-value: 93%; }
+@property --sh-spot3-y { syntax: '<percentage>'; inherits: false; initial-value: 50%; }
+@property --sh-spot4-x { syntax: '<percentage>'; inherits: false; initial-value: 50%; }
+@property --sh-spot4-y { syntax: '<percentage>'; inherits: false; initial-value: 75%; }
+
+/* hero subject ambient sunlight — same pattern as the CTA orbit. four
+ * drifting radial wells around the subject simulate slow atmospheric
+ * refraction at dusk. intensity breathes in/out subtly. */
+@property --sh-sun1-x { syntax: '<percentage>'; inherits: false; initial-value: 35%; }
+@property --sh-sun1-y { syntax: '<percentage>'; inherits: false; initial-value: 38%; }
+@property --sh-sun2-x { syntax: '<percentage>'; inherits: false; initial-value: 72%; }
+@property --sh-sun2-y { syntax: '<percentage>'; inherits: false; initial-value: 60%; }
+@property --sh-sun3-x { syntax: '<percentage>'; inherits: false; initial-value: 78%; }
+@property --sh-sun3-y { syntax: '<percentage>'; inherits: false; initial-value: 28%; }
+@property --sh-sun4-x { syntax: '<percentage>'; inherits: false; initial-value: 24%; }
+@property --sh-sun4-y { syntax: '<percentage>'; inherits: false; initial-value: 70%; }
+@property --sh-sun-intensity { syntax: '<number>'; inherits: false; initial-value: 1; }

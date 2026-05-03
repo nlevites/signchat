@@ -1,0 +1,1008 @@
+/* Signchat hero header — Superhuman-derived cinematic cockpit.
+ * Tokens: --sh-* in app/globals.css.
+ * Keyframes are defined here (not globally) because css-modules scopes
+ * keyframe names to the module — they only resolve in this file. */
+
+@keyframes sh-fade-slide-down {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes sh-fade-slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes sh-fade-only {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes sh-header-enter {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes sh-underline-grow {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+@keyframes sh-cta-orbit {
+  0%, 100% {
+    --sh-spot1-x: 68%;  --sh-spot1-y: 50%;
+    --sh-spot2-x: 50%;  --sh-spot2-y: 98%;
+    --sh-spot3-x: 93%;  --sh-spot3-y: 50%;
+    --sh-spot4-x: 50%;  --sh-spot4-y: 75%;
+  }
+  25% {
+    --sh-spot1-x: 52%;  --sh-spot1-y: 97%;
+    --sh-spot2-x: 43%;  --sh-spot2-y: 57%;
+    --sh-spot3-x: 56%;  --sh-spot3-y: 36%;
+    --sh-spot4-x: 90%;  --sh-spot4-y: 54%;
+  }
+  50% {
+    --sh-spot1-x: 32%;  --sh-spot1-y: 50%;
+    --sh-spot2-x: 50%;  --sh-spot2-y:  2%;
+    --sh-spot3-x:  7%;  --sh-spot3-y: 50%;
+    --sh-spot4-x: 50%;  --sh-spot4-y: 25%;
+  }
+  75% {
+    --sh-spot1-x: 47%;  --sh-spot1-y:  3%;
+    --sh-spot2-x: 57%;  --sh-spot2-y: 43%;
+    --sh-spot3-x: 44%;  --sh-spot3-y: 64%;
+    --sh-spot4-x: 10%;  --sh-spot4-y: 46%;
+  }
+}
+
+/* subject sunlight — slow atmospheric drift. each well orbits its own
+ * home position on a tight ~8-12% radius and runs on a coprime-ish
+ * period (37/43/53/61s) so they never sync. linear timing means no
+ * decel/accel "beat" at the waypoints; combined with the small radius
+ * the motion reads as continuous atmospheric refraction, not a loop. */
+@keyframes sh-sun1-drift {
+  0%   { --sh-sun1-x: 35%; --sh-sun1-y: 38%; }
+  25%  { --sh-sun1-x: 42%; --sh-sun1-y: 32%; }
+  50%  { --sh-sun1-x: 38%; --sh-sun1-y: 44%; }
+  75%  { --sh-sun1-x: 30%; --sh-sun1-y: 40%; }
+  100% { --sh-sun1-x: 35%; --sh-sun1-y: 38%; }
+}
+@keyframes sh-sun2-drift {
+  0%   { --sh-sun2-x: 72%; --sh-sun2-y: 60%; }
+  25%  { --sh-sun2-x: 78%; --sh-sun2-y: 56%; }
+  50%  { --sh-sun2-x: 70%; --sh-sun2-y: 66%; }
+  75%  { --sh-sun2-x: 66%; --sh-sun2-y: 58%; }
+  100% { --sh-sun2-x: 72%; --sh-sun2-y: 60%; }
+}
+@keyframes sh-sun3-drift {
+  0%   { --sh-sun3-x: 78%; --sh-sun3-y: 28%; }
+  25%  { --sh-sun3-x: 72%; --sh-sun3-y: 34%; }
+  50%  { --sh-sun3-x: 82%; --sh-sun3-y: 36%; }
+  75%  { --sh-sun3-x: 84%; --sh-sun3-y: 30%; }
+  100% { --sh-sun3-x: 78%; --sh-sun3-y: 28%; }
+}
+@keyframes sh-sun4-drift {
+  0%   { --sh-sun4-x: 24%; --sh-sun4-y: 70%; }
+  25%  { --sh-sun4-x: 30%; --sh-sun4-y: 64%; }
+  50%  { --sh-sun4-x: 22%; --sh-sun4-y: 76%; }
+  75%  { --sh-sun4-x: 18%; --sh-sun4-y: 68%; }
+  100% { --sh-sun4-x: 24%; --sh-sun4-y: 70%; }
+}
+@keyframes sh-sun-breathe {
+  0%   { --sh-sun-intensity: 0.94; }
+  50%  { --sh-sun-intensity: 1.06; }
+  100% { --sh-sun-intensity: 0.94; }
+}
+
+/* ---- root wrapper ----------------------------------------------------- */
+/* the area above and around the banner pill paints with the dusk gradient
+ * so there's no white strip at the top of the page above the banner.
+ * the hero below picks up the same gradient and they blend seamlessly. */
+.root {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  background: var(--sh-gradient-hero-dusk);
+  color: var(--sh-color-ink);
+  font-family: var(--font-sans);
+}
+
+/* ---- shared inner wrapper: contains banner + nav (1440px = 1200 +20%) */
+.headerInner {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* ---- announcement banner — IN FLOW (not sticky). scrolls away. ------- */
+.bannerWrap {
+  position: relative;
+  z-index: 49;
+  width: 100%;
+  padding-top: 8px;
+}
+
+/* ---- sticky nav row (banner is OUTSIDE this) ------------------------- */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.008);
+  -webkit-backdrop-filter: blur(12px);
+          backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(252, 250, 247, 0.0017);
+  animation: sh-header-enter 0.5s ease both;
+}
+
+/* ---- announcement banner --------------------------------------------- */
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  height: 64px;
+  padding: 12px;
+  background: var(--sc-banner-gradient);
+  border-radius: 16px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: -0.315px;
+  text-decoration: none;
+  animation: sh-fade-only 0.4s ease 0s both;
+}
+
+.bannerText {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.bannerCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background-color: transparent;
+  color: #ffffff;
+  transition: background-color var(--sh-motion-base) var(--sh-motion-easing);
+}
+.bannerCta:hover {
+  background-color: rgba(255, 255, 255, 0.10);
+}
+
+/* ---- top nav --------------------------------------------------------- */
+.nav {
+  display: flex;
+  align-items: center;
+  height: 67px;
+  gap: 32px;
+}
+
+/* left cluster — logo + product links sit shoulder-to-shoulder. without
+ * .navSpacer below taking flex:1, the right cluster would float to the
+ * middle of the bar. */
+.navLeft {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+.navSpacer { flex: 1 1 auto; }
+
+.navLogo {
+  display: inline-flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.95);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.navLinks {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.navLink {
+  position: relative;
+  font-size: 14px;
+  font-weight: 460;
+  letter-spacing: -0.07px;
+  color: rgba(255, 255, 255, 0.95);
+  text-decoration: none;
+  padding: 8px 4px;
+  transition: color var(--sh-motion-base) var(--sh-motion-easing);
+}
+.navLink:hover {
+  color: #ffffff;
+}
+.navLink:hover::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 2px;
+  height: 1.5px;
+  background: currentColor;
+  transform-origin: left;
+  animation: sh-underline-grow var(--sh-motion-base) var(--sh-motion-easing) forwards;
+}
+
+/* product nav item — hover-triggered dropdown */
+.navItem {
+  position: relative;
+  list-style: none;
+}
+
+.navTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.navDropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  min-width: 240px;
+  padding: 8px;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow:
+    0 16px 40px rgba(20, 22, 38, 0.14),
+    0 4px 10px rgba(20, 22, 38, 0.06);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--sh-motion-base) var(--sh-motion-easing),
+    transform var(--sh-motion-base) var(--sh-motion-easing),
+    visibility var(--sh-motion-base) var(--sh-motion-easing);
+  z-index: 60;
+}
+
+.navItem:hover .navDropdown,
+.navItem:focus-within .navDropdown {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.navDropdownList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.navDropdownItem {
+  display: block;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 460;
+  letter-spacing: -0.01em;
+  color: var(--sh-color-ink);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: box-shadow var(--sh-motion-base) var(--sh-motion-easing);
+}
+.navDropdownItem:hover,
+.navDropdownItem:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--sh-color-iris);
+}
+
+.navRight {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.navGhost {
+  font-size: 14px;
+  font-weight: 460;
+  letter-spacing: -0.07px;
+  color: rgba(255, 255, 255, 0.95);
+  text-decoration: none;
+  padding: 8px 4px;
+  transition: color var(--sh-motion-base) var(--sh-motion-easing);
+}
+.navGhost:hover { color: #ffffff; }
+
+.navSignup {
+  display: inline-flex;
+  align-items: center;
+  background: var(--sh-color-lavender-chip);
+  color: var(--sh-color-ink);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.07px;
+  line-height: 1;
+  padding: 8px 14px;
+  border-radius: 8px;
+  text-decoration: none;
+  transition:
+    filter var(--sh-motion-base) var(--sh-motion-easing),
+    box-shadow var(--sh-motion-base) var(--sh-motion-easing);
+}
+.navSignup:hover { filter: brightness(0.96); }
+.navSignup:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(113, 76, 182, 0.5);
+}
+
+/* ---- hero section ---------------------------------------------------- */
+.hero {
+  position: relative;
+  isolation: isolate;
+  min-height: 1160px;
+  max-height: 1160px;
+  width: 100%;
+  overflow: hidden;
+  background: var(--sh-gradient-hero-dusk);
+  color: #ffffff;
+  /* hero overlaps the entire header stack (8px wrap padding + 64px banner
+     + 67px sticky nav = 139px) so the dusk video extends to viewport y=0
+     behind the banner pill — no visible bg transition. inner content
+     starts where the (sticky) nav ends thanks to the matching padding.
+     hero is sized so the title fills the full first viewport (1080) and
+     all 7 panels sit below the fold; scroll reveals the panel grid. */
+  margin-top: -139px;
+  padding-top: 139px;
+}
+
+.heroBg {
+  position: absolute;
+  inset: 0;
+  background: var(--sh-gradient-hero-dusk);
+  z-index: 0;
+  overflow: hidden;
+}
+.heroBg video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.heroSubject {
+  position: absolute;
+  left: 50%;
+  top: 350px;
+  transform: translateX(-50%);
+  width: min(1152px, 100%);
+  height: 860px;
+  z-index: 1;
+  margin: 0;
+  pointer-events: none;
+}
+/* sunset glow — animated atmospheric wash painted BEHIND the subject.
+ * four warm-to-violet wells each run on their own coprime-ish period
+ * (37/43/53/61s) with linear timing so they never sync into a beat.
+ * intensity breathes on a 5th cycle (29s). colours bridge the video's
+ * violet/rose dusk and a warm horizon key. */
+.heroSubject::before {
+  content: "";
+  position: absolute;
+  inset: -10% -16% -4% -16%;
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--sh-sun-intensity, 1);
+  background:
+    radial-gradient(circle at var(--sh-sun1-x, 35%) var(--sh-sun1-y, 38%),
+      rgba(255, 195, 140, 0.46) 0%,
+      rgba(255, 195, 140, 0.18) 22%,
+      rgba(255, 195, 140, 0) 42%),
+    radial-gradient(circle at var(--sh-sun2-x, 72%) var(--sh-sun2-y, 60%),
+      rgba(255, 130, 165, 0.36) 0%,
+      rgba(255, 130, 165, 0.14) 25%,
+      rgba(255, 130, 165, 0) 46%),
+    radial-gradient(circle at var(--sh-sun3-x, 78%) var(--sh-sun3-y, 28%),
+      rgba(180, 130, 220, 0.32) 0%,
+      rgba(180, 130, 220, 0.12) 28%,
+      rgba(180, 130, 220, 0) 50%),
+    radial-gradient(circle at var(--sh-sun4-x, 24%) var(--sh-sun4-y, 70%),
+      rgba(150, 140, 220, 0.24) 0%,
+      rgba(150, 140, 220, 0.10) 30%,
+      rgba(150, 140, 220, 0) 52%),
+    radial-gradient(60% 50% at 50% 36%,
+      rgba(255, 170, 120, 0.16) 0%,
+      transparent 70%);
+  /* soft elliptical mask kills the rectangular pseudo-edge. radii must
+   * be < 50% so the ellipse actually intersects the box (an ellipse at
+   * radius >= 50% circumscribes the inscribed half and never clips —
+   * the previous 68%/78% values left the entire box opaque). multi-stop
+   * falloff with no plateau gives a continuous fade with no visible
+   * step from "inside the glow" to "outside the glow". */
+  -webkit-mask-image: radial-gradient(ellipse 46% 52% at 50% 44%,
+    rgba(0,0,0,1) 0%,
+    rgba(0,0,0,1) 14%,
+    rgba(0,0,0,0.86) 34%,
+    rgba(0,0,0,0.56) 56%,
+    rgba(0,0,0,0.26) 78%,
+    rgba(0,0,0,0) 100%);
+          mask-image: radial-gradient(ellipse 46% 52% at 50% 44%,
+    rgba(0,0,0,1) 0%,
+    rgba(0,0,0,1) 14%,
+    rgba(0,0,0,0.86) 34%,
+    rgba(0,0,0,0.56) 56%,
+    rgba(0,0,0,0.26) 78%,
+    rgba(0,0,0,0) 100%);
+  animation:
+    sh-sun1-drift   37s linear infinite,
+    sh-sun2-drift   43s linear infinite,
+    sh-sun3-drift   53s linear infinite,
+    sh-sun4-drift   61s linear infinite,
+    sh-sun-breathe  29s ease-in-out infinite;
+}
+/* softer outer halo, larger and even slower for parallax depth. drives
+ * the same well custom properties from the parent on a longer, reversed
+ * cycle so the halo lags behind the inner wash. */
+.heroSubject::after {
+  content: "";
+  position: absolute;
+  inset: -18% -22% -8% -22%;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    radial-gradient(70% 55% at 50% 42%,
+      rgba(255, 160, 110, 0.18) 0%,
+      rgba(220, 130, 180, 0.10) 35%,
+      rgba(140, 130, 210, 0.06) 60%,
+      transparent 80%);
+  -webkit-mask-image: radial-gradient(ellipse 48% 54% at 50% 46%,
+    rgba(0,0,0,1) 0%,
+    rgba(0,0,0,1) 8%,
+    rgba(0,0,0,0.78) 30%,
+    rgba(0,0,0,0.46) 55%,
+    rgba(0,0,0,0.18) 80%,
+    rgba(0,0,0,0) 100%);
+          mask-image: radial-gradient(ellipse 48% 54% at 50% 46%,
+    rgba(0,0,0,1) 0%,
+    rgba(0,0,0,1) 8%,
+    rgba(0,0,0,0.78) 30%,
+    rgba(0,0,0,0.46) 55%,
+    rgba(0,0,0,0.18) 80%,
+    rgba(0,0,0,0) 100%);
+  animation: sh-sun-breathe 71s linear infinite reverse;
+  opacity: calc(0.85 * var(--sh-sun-intensity, 1));
+}
+.heroSubject img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+  -webkit-mask-image: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 25%, rgba(0,0,0,1) 100%);
+          mask-image: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 25%, rgba(0,0,0,1) 100%);
+}
+
+.fireflies {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ---- title stack — H1 starts ~y=155 from hero top per spec --------- */
+.titleGroup {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 32px;
+  padding: 16px 24px 0;
+  max-width: 880px;
+  margin: 0 auto;
+  pointer-events: auto;
+}
+
+/* H1/H2 sizes are !important on purpose: defends against a global type
+ * scale leaking into the marketing hero (the app's design system declares
+ * .t-display etc; we want the Superhuman-derived dimensions verbatim). */
+.headline {
+  font-family: var(--font-sans);
+  font-size: 64px !important;
+  font-weight: 460 !important;
+  line-height: 0.96 !important;
+  letter-spacing: -0.028em !important;
+  color: #ffffff;
+  margin: 0;
+  text-align: center;
+  text-wrap: balance;
+  animation: sh-fade-slide-down 0.5s ease 0.1s both;
+}
+
+.subheadline {
+  font-family: var(--font-sans);
+  font-size: 26px !important;
+  font-weight: 400 !important;
+  line-height: 1.3 !important;
+  letter-spacing: normal !important;
+  color: #ffffff;
+  margin: 0;
+  max-width: 760px;
+  text-align: center;
+  animation: sh-fade-slide-up 0.5s ease 0.25s both;
+}
+
+.ctaWrap {
+  animation: sh-fade-slide-up 0.5s ease 0.25s both;
+}
+
+/* ---- CTA button (with rotating-spotlight icon) ----------------------- */
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 6px 6px 16px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  color: #ffffff;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 460;
+  line-height: 1;
+  background-image: linear-gradient(rgb(27, 25, 56), rgb(27, 25, 56));
+  box-shadow: var(--sh-shadow-cta);
+  text-decoration: none;
+  transition:
+    background-image var(--sh-motion-base) var(--sh-motion-easing),
+    border-color     var(--sh-motion-base) var(--sh-motion-easing),
+    box-shadow       var(--sh-motion-base) var(--sh-motion-easing);
+}
+.cta:hover {
+  background-image: linear-gradient(rgb(27, 25, 56), rgb(45, 42, 92));
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: var(--sh-shadow-cta-hover);
+}
+.cta:focus-visible {
+  outline: none;
+  box-shadow: var(--sh-shadow-cta-focus);
+}
+
+.ctaIcon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 36px;
+  border-radius: 9px;
+  color: #ffffff;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0)),
+    radial-gradient(circle at var(--sh-spot1-x) var(--sh-spot1-y), rgba(133, 125, 250, 0.6) 0px, transparent 50%),
+    radial-gradient(circle at var(--sh-spot2-x) var(--sh-spot2-y), rgba(255,  51, 102, 0.6) 0px, transparent 50%),
+    radial-gradient(circle at var(--sh-spot3-x) var(--sh-spot3-y), rgba( 75, 105, 227, 0.5) 0px, transparent 50%),
+    radial-gradient(circle at var(--sh-spot4-x) var(--sh-spot4-y), rgba(104, 222, 255, 0.5) 0px, transparent 50%),
+    linear-gradient(rgb(85, 77, 203), rgb(74, 67, 176));
+  animation: sh-cta-orbit 10s linear infinite;
+}
+
+/* ---- glass panel base ------------------------------------------------
+ * NB: we deliberately avoid transform on this container — a transform
+ * would create a stacking context and `backdrop-filter` on the panel
+ * children would have nothing to blur. center via inset + max-width. */
+.panels {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  max-width: 1400px;
+  height: 1160px;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.panel {
+  position: absolute;
+  background: var(--sh-gradient-glass);
+  -webkit-backdrop-filter: blur(12px);
+          backdrop-filter: blur(12px);
+  border-radius: 16px;
+  color: #ffffff;
+  padding: 16px;
+  font-size: 14px;
+  font-weight: 460;
+  line-height: 1.45;
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateY(12px);
+  animation: sh-fade-slide-up 0.6s var(--sh-motion-easing) both;
+  animation-delay: calc(0.4s + var(--sh-index, 0) * 0.08s);
+  overflow: hidden;
+}
+
+.panelRounded { border-radius: 24px; }
+.panelPill {
+  border-radius: 24px;
+  padding: 12px 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+/* ---- panel: chat assistant ------------------------------------------- */
+.chatHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.chatBubble {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.chatReply {
+  align-self: flex-end;
+  background: rgba(212, 199, 255, 0.18);
+  border: 1px solid rgba(212, 199, 255, 0.30);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  display: inline-block;
+  margin-bottom: 8px;
+}
+.chatPills {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.chatPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.86);
+}
+.chatInput {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.20);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 6px 6px 6px 14px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+}
+.chatSend {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  margin-left: auto;
+}
+
+/* ---- panel: agent rail ----------------------------------------------- */
+/* the rail is left-anchored (not centred) so each dot can grow rightward
+ * from a fixed left edge — at rest it reads as a column of circles, in
+ * motion the active circle morphs into a pill that exposes its name. */
+.agentRail {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0 12px 8px;
+}
+.agentDot {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 7px;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  white-space: nowrap;
+  /* width morph on a slow loop. each dot picks a delay below so the
+   * pill opening happens one provider at a time. */
+  animation: sh-agent-pill 10s ease-in-out infinite;
+  will-change: width;
+}
+.agentDot > span:first-child { flex-shrink: 0; }
+.agentDot:nth-child(1) { animation-delay: 0s; }
+.agentDot:nth-child(2) { animation-delay: 2s; }
+.agentDot:nth-child(3) { animation-delay: 4s; }
+.agentDot:nth-child(4) { animation-delay: 6s; }
+.agentDot:nth-child(5) { animation-delay: 8s; }
+
+/* the label rides INSIDE the dot. as the dot widens, this slides out
+ * from behind the logo; opacity ramps in slightly after the width
+ * starts moving so the text doesn't pop before there's room for it. */
+.agentLabel {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: rgba(255, 255, 255, 0.96);
+  opacity: 0;
+  animation: sh-agent-label 10s ease-in-out infinite;
+}
+.agentDot:nth-child(1) .agentLabel { animation-delay: 0s; }
+.agentDot:nth-child(2) .agentLabel { animation-delay: 2s; }
+.agentDot:nth-child(3) .agentLabel { animation-delay: 4s; }
+.agentDot:nth-child(4) .agentLabel { animation-delay: 6s; }
+.agentDot:nth-child(5) .agentLabel { animation-delay: 8s; }
+
+@keyframes sh-agent-pill {
+  0%, 4%   { width: 32px; }
+  10%, 16% { width: 148px; }
+  22%, 100% { width: 32px; }
+}
+@keyframes sh-agent-label {
+  0%, 7%   { opacity: 0; }
+  12%, 16% { opacity: 1; }
+  20%, 100% { opacity: 0; }
+}
+
+/* ---- panel: editor / doc -------------------------------------------- */
+.editorTopBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.65);
+  margin-bottom: 14px;
+}
+.editorTopBar > :first-child { font-weight: 500; color: rgba(255, 255, 255, 0.85); }
+.editorTopBar > .editorSpacer { flex: 1; }
+.editorTitle {
+  font-size: 18px;
+  font-weight: 460;
+  line-height: 1.3;
+  margin-bottom: 10px;
+}
+.editorBody {
+  font-size: 13px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.82);
+}
+.editorBody p { margin: 0 0 8px; }
+.editorBody u { text-decoration-color: var(--sh-color-iris); text-decoration-thickness: 1.5px; }
+.editorToolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.10);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+.editorTool {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ---- panel: mail / list ---------------------------------------------- */
+.mailHeader {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 10px;
+}
+.mailTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.mailTabActive {
+  color: #ffffff;
+  font-weight: 460;
+}
+.mailTabCount {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 11px;
+}
+.mailRows { display: flex; flex-direction: column; gap: 4px; }
+.mailRow {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 12px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.86);
+}
+.mailRow strong { font-weight: 460; color: #ffffff; }
+.mailRow span { color: rgba(255, 255, 255, 0.55); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mailRowSelected { background: rgba(255, 255, 255, 0.10); }
+
+/* ---- panel: pill chips (search / reply / scheduler) ------------------ */
+.pillIcon {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.10);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+/* ---- per-slot positioning -------------------------------------------
+ * tops are nudged +250 from the original Superhuman coordinates so all
+ * panels sit BELOW the title stack but flank the hero subject left/right
+ * at his torso level. left positions (x-axis) are unchanged. */
+/* slots tuned for a 1400px container — left cards hug the left edge,
+ * right cards hug the right edge. tops shifted up so panels sit closer
+ * to the title (still clear of the CTA). */
+.slotChat       { top: 480px;  left: 0;     width: 360px; height: 328px; display: flex; flex-direction: column; }
+.slotAgents     { top: 524px;  left: 380px; width: 48px;  height: 240px; padding: 0; overflow: visible; }
+.slotSearch     { top: 588px;  left: 1040px; width: 360px; height: 45px; padding: 12px 16px; }
+.slotEditor     { top: 657px;  left: 870px; width: 410px; height: 290px; z-index: 1; }
+.slotReply      { top: 971px;  left: 1130px; width: 270px; height: 45px; padding: 12px 16px; z-index: 1; }
+.slotMail       { top: 832px;  left: 0;     width: 470px; height: 237px; z-index: 3; }
+.slotScheduler  { top: 1010px; left: 800px; width: 250px; height: 91px; z-index: 3; padding: 14px 16px; display: flex; align-items: center; gap: 10px; border-radius: 16px; }
+
+/* ---- responsive: hide heaviest panels below the hero composition's
+ *      design width so the layout doesn't collapse on narrow viewports. */
+@media (max-width: 1199px) {
+  .panels { transform: scale(0.86); transform-origin: top center; }
+}
+@media (max-width: 1023px) {
+  .panels { display: none; }
+  .heroSubject { top: 320px; height: 540px; }
+  .titleGroup { padding-top: 48px; }
+}
+@media (max-width: 768px) {
+  .navLinks { display: none; }
+  .headline { font-size: 44px; }
+  .subheadline { font-size: 20px; }
+  .navRight > .navGhost:first-child { display: none; }
+  .banner { font-size: 13px; }
+  .heroSubject { height: 420px; }
+}
+@media (max-width: 480px) {
+  .navRight > .navGhost { display: none; }
+  .headline { font-size: 36px; }
+}
+
+/* ---- integrations band (white section, boxed cell row) --------------
+ * NB: no entrance animation. an opacity-0 → 1 fade would expose the
+ * dusk-coloured root behind the band during first paint, which reads
+ * as a "weird purple stripe" before the surface fills in.
+ * design-system note: this is the one full-width white surface outside
+ * cards/room — see system-design.md "what to avoid" exceptions. */
+.integrationsBand {
+  /* bg comes from the .sc-branded-frame wrapper so the wrapper's hatched
+   * rails stay visible underneath. */
+  padding: 36px 0;
+}
+.integrationsInner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+}
+.integrationsHeading {
+  font-family: var(--font-sans);
+  font-weight: 460;
+  font-size: 22px;
+  line-height: 1.25;
+  letter-spacing: -0.31px;
+  color: #292827;
+  text-align: center;
+  max-width: 720px;
+  margin: 0;
+}
+/* row reads as one card: outer fog border, internal fog cell dividers.
+ * hatched bookend rails live on the .sc-branded-frame wrapper that
+ * spans this section + the suite, so they aren't repeated here. */
+.integrationsLogos {
+  position: relative;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  width: 100%;
+  align-items: stretch;
+  justify-content: stretch;
+  gap: 0;
+  flex-wrap: nowrap;
+  height: 64px;
+  border: 1px solid #e3e3e2;
+  background: #ffffff;
+}
+.integrationsLogos > li {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid #e3e3e2;
+  padding: 0 16px;
+}
+.integrationsLogos > li:last-child { border-right: 0; }
+.integrationsLogos a {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  opacity: 0.85;
+  transition: opacity var(--sh-motion-base) var(--sh-motion-easing);
+  text-decoration: none;
+}
+.integrationsLogos a:hover { opacity: 1; }
+.integrationsLogos img {
+  height: 24px;
+  width: auto;
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .integrationsLogos {
+    height: auto;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 16px 0;
+  }
+  .integrationsLogos > li {
+    flex: 0 0 auto;
+    border-right: 0;
+    height: 40px;
+    padding: 0 20px;
+  }
+}
+
+/* ---- reduced motion -------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .header, .banner, .headline, .subheadline, .ctaWrap, .panel {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .ctaIcon { animation: none !important; }
+  .heroSubject::before,
+  .heroSubject::after { animation: none !important; }
+  .agentDot   { animation: none !important; width: 32px !important; }
+  .agentLabel { animation: none !important; opacity: 0 !important; }
+  .fireflies { display: none; }
+}
+
+/* ---- graceful degradation: no backdrop-filter ------------------------ */
+@supports not ((backdrop-filter: blur(12px)) or (-webkit-backdrop-filter: blur(12px))) {
+  .header { background: rgba(20, 22, 38, 0.55); }
+  .panel  { background: rgba(31, 27, 90, 0.55); }
+}
