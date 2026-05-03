@@ -5,7 +5,7 @@ import "./globals.css";
 
 const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-super-sans-vf",
+  variable: "--font-sans",
   display: "swap",
 });
 
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={inter.variable}>
-      <body className="bg-parchment-canvas text-ink antialiased">{children}</body>
+      <body className="antialiased">{children}</body>
     </html>
   );
 }

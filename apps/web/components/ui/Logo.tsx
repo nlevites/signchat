@@ -8,6 +8,8 @@ interface LogoProps {
   glow?: boolean;
   className?: string;
   wordmarkSize?: number;
+  /** "overlay" — full-color 3D PNGs (use on dark/photo bg).
+   *  "solid"  — brand-gradient silhouette via mask-image (use on light surfaces). */
   surface?: "overlay" | "solid";
 }
 
@@ -18,7 +20,7 @@ const MASK_COMMON: CSSProperties = {
   maskPosition: "center",
   WebkitMaskSize: "contain",
   maskSize: "contain",
-  background: "var(--gradient-brand-accent)",
+  background: "var(--sc-accent-gradient)",
 };
 
 export function Logo({

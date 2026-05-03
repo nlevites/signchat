@@ -1,118 +1,337 @@
+/* signchat design system — single source of truth.
+ * surfaces, accent, motion, recipes. all token values commented.
+ * comments explain WHEN to use each token, not what the value is. */
+
 @import "tailwindcss";
 
-@theme {
-  --color-parchment-canvas: #f2f0eb;
-  --color-ink: #292827;
-  --color-bone: #ffffff;
-  --color-fog: #e3e3e2;
-  --color-driftwood: #dcd7d3;
-  --color-graphite: #666666;
-  --color-aubergine: #421d24;
-  --color-aubergine-deep: #4e242c;
-  --color-iris: #714cb6;
-  --color-indigo-glow: #353088;
-  --color-lavender-chip: #d4c7ff;
+/* =====================================================================
+ * 1. raw tokens — `:root`. used in css recipes + inline styles.
+ * ===================================================================== */
+:root {
+  /* ---- surfaces (cool near-white) ---- */
+  --sc-bg: #f6f7fb;          /* page background — used on body, /start, /room light areas */
+  --sc-surface: #ffffff;     /* lifted card surface — start card, chat panel, modal */
+  --sc-surface-2: #eef0f6;   /* sunken row tint — selected list row, video-stage gutter */
+  --sc-surface-3: #e5e8f1;   /* deeper sunken — debug panel inner shading */
+  --sc-border: #e3e6ef;      /* default 1px hairline */
+  --sc-border-strong: #cdd1de; /* hover-state border, focused-input border */
+  --sc-divider: #eceef5;     /* horizontal rules, panel splits */
 
-  --gradient-hero-dusk: linear-gradient(
-    to left bottom,
-    rgba(168, 164, 216, 0.5),
-    rgba(107, 165, 232, 0.5),
-    rgba(176, 112, 192, 0.6),
-    rgba(144, 136, 208, 0.5)
-  );
+  /* ---- text (cool near-black) ---- */
+  --sc-text: #121422;        /* body text, headings */
+  --sc-text-2: #474b5c;      /* secondary copy, paragraph captions */
+  --sc-text-3: #858a9b;      /* meta, placeholders, muted "back" buttons */
+  --sc-text-inverse: #f8f9fc; /* text on accent / dark surfaces */
 
-  --gradient-spotlight-violet: radial-gradient(circle at 68% 50%, rgba(133, 125, 250, 0.6) 0px, rgba(0, 0, 0, 0) 50%);
-  --gradient-spotlight-pink: radial-gradient(circle at 50% 98%, rgba(255, 51, 102, 0.6) 0px, rgba(0, 0, 0, 0) 50%);
-  --gradient-spotlight-blue: radial-gradient(circle at 93% 50%, rgba(75, 105, 227, 0.5) 0px, rgba(0, 0, 0, 0) 50%);
-  --gradient-spotlight-cyan: radial-gradient(circle at 50% 75%, rgba(104, 222, 255, 0.5) 0px, rgba(0, 0, 0, 0) 50%);
+  /* ---- accent — luminous periwinkle. brand color of the app. ---- */
+  --sc-accent-300: #bcbef9;  /* lavender highlight, pill rim, on-dark text accent */
+  --sc-accent-400: #9294f4;  /* soft periwinkle — indicator dots, non-text emphasis */
+  --sc-accent-500: #7578f0;  /* MAIN — focus rings, brand mark, links, AA */
+  --sc-accent-600: #6063e6;  /* primary fill — gradient base. AA white text */
+  --sc-accent-700: #4f52d0;  /* primary hover. selected text on soft wash */
+  --sc-accent-800: #4043b4;  /* pressed / deep gradient stop */
 
-  --gradient-brand-accent: linear-gradient(135deg, #714cb6 0%, #353088 100%);
+  --sc-accent-soft:    #eeeffe; /* selected-row wash, hover tint */
+  --sc-accent-soft-2:  #e2e3fc; /* deeper wash */
+  --sc-accent-rim:     rgba(255, 255, 255, 0.32);  /* inner glossy highlight on filled accent */
+  --sc-accent-glow:    rgba(117, 120, 240, 0.35);  /* halo */
+  --sc-accent-glow-soft: rgba(117, 120, 240, 0.18);
 
-  --gradient-cta-icon:
-    linear-gradient(rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 100%),
-    radial-gradient(circle at 68% 50%, rgba(133, 125, 250, 0.6) 0px, rgba(0, 0, 0, 0) 50%),
-    radial-gradient(circle at 50% 98%, rgba(255, 51, 102, 0.6) 0px, rgba(0, 0, 0, 0) 50%),
-    radial-gradient(circle at 93% 50%, rgba(75, 105, 227, 0.5) 0px, rgba(0, 0, 0, 0) 50%),
-    radial-gradient(circle at 50% 75%, rgba(104, 222, 255, 0.5) 0px, rgba(0, 0, 0, 0) 50%),
-    linear-gradient(rgb(85, 77, 203), rgb(74, 67, 176));
+  /* gradients — `135deg` diagonal for fills, `180deg` vertical for atmospheric blooms */
+  --sc-accent-gradient: linear-gradient(135deg, #6063e6 0%, #5457d8 52%, #4346c0 100%);
+  --sc-accent-gradient-soft: linear-gradient(180deg, rgba(146, 148, 244, 0.22) 0%, rgba(96, 99, 230, 0.12) 100%);
+  /* deep variant — only on FeatureCard. darker enclosure for white copy. */
+  --sc-accent-gradient-deep: linear-gradient(135deg, #5457d8 0%, #4043b4 55%, #2e3096 100%);
 
-  --font-super-sans-vf: "Inter Variable", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* ---- hero field — single atmospheric gradient. used on landing only.
+   * top 75% is deep periwinkle; bottom 25% fades to --sc-bg.
+   * pair with `.sc-hero-field` recipe so children render above the fade safety net. ---- */
+  --sc-hero-deep: #0e1133;
+  --sc-hero-mid: #1f2f8c;
+  --sc-hero-bloom: rgba(146, 148, 244, 0.55);
+  --sc-hero-fade: var(--sc-bg);
+  --sc-hero-gradient:
+    radial-gradient(110% 60% at 50% 20%, rgba(146, 148, 244, 0.55) 0%, rgba(96, 99, 230, 0) 60%),
+    radial-gradient(85% 45% at 50% 68%, rgba(146, 148, 244, 0.20) 0%, rgba(96, 99, 230, 0) 65%),
+    linear-gradient(180deg,
+      #0e1133 0%, #161a55 18%, #1f2569 35%, #252b82 50%,
+      #2e37a0 62%, #3f49b0 75%, #6e78c2 85%, #a9b0da 93%,
+      #d4d8e9 97%, var(--sc-bg) 100%
+    );
 
-  --text-caption: 12px;
-  --leading-caption: 1.5;
-  --text-body-sm: 14px;
-  --leading-body-sm: 1.5;
-  --text-body: 16px;
-  --leading-body: 1.5;
-  --text-subheading: 18px;
-  --leading-subheading: 1.3;
-  --tracking-subheading: -0.14px;
-  --text-heading-sm: 22px;
-  --leading-heading-sm: 1.25;
-  --tracking-heading-sm: -0.31px;
-  --text-heading: 28px;
-  --leading-heading: 1.2;
-  --tracking-heading: -0.62px;
-  --text-heading-lg: 48px;
-  --leading-heading-lg: 1;
-  --tracking-heading-lg: -1.3px;
-  --text-display: 64px;
-  --leading-display: 0.96;
-  --tracking-display: -1.79px;
+  /* ---- footer — same hue family as the hero, just deeper.
+   * use `.sc-footer-surface` recipe. ---- */
+  --sc-footer-gradient:
+    radial-gradient(80% 60% at 50% 0%, rgba(146, 148, 244, 0.10) 0%, rgba(0, 0, 0, 0) 60%),
+    linear-gradient(180deg, var(--sc-hero-deep) 0%, #090b22 60%, #06081a 100%);
 
-  --font-weight-w460: 460;
-  --font-weight-medium: 500;
-  --font-weight-w540: 540;
-  --font-weight-semibold: 600;
-  --font-weight-bold: 700;
+  /* ---- status (cool-leaning) ---- */
+  --sc-success: #17a573;
+  --sc-success-subtle: #e3f5ec;
+  --sc-warning: #d98e26;
+  --sc-warning-subtle: #fcf1dd;
+  --sc-danger:  #db4f3b;     /* leave-call button, error toast */
+  --sc-danger-subtle: #fce7e2;
 
-  --spacing-4: 4px;
-  --spacing-8: 8px;
-  --spacing-12: 12px;
-  --spacing-16: 16px;
-  --spacing-20: 20px;
-  --spacing-24: 24px;
-  --spacing-28: 28px;
-  --spacing-32: 32px;
-  --spacing-36: 36px;
-  --spacing-40: 40px;
-  --spacing-48: 48px;
-  --spacing-64: 64px;
-  --spacing-80: 80px;
-  --spacing-96: 96px;
+  /* ---- focus ---- */
+  --sc-focus: var(--sc-accent-500);  /* periwinkle outline on every :focus-visible */
 
-  --radius-button: 8px;
-  --radius-link: 12px;
-  --radius-cta: 12px;
-  --radius-card: 16px;
-  --radius-card-lg: 24px;
-  --radius-pill: 999px;
+  /* ---- spacing scale — 4px base, used for both layout AND tailwind spacing utils ---- */
+  --sc-space-1:  4px;
+  --sc-space-2:  8px;
+  --sc-space-3:  12px;
+  --sc-space-4:  16px;
+  --sc-space-5:  20px;
+  --sc-space-6:  24px;
+  --sc-space-8:  32px;
+  --sc-space-10: 40px;
+  --sc-space-12: 48px;
+  --sc-space-16: 64px;
+  --sc-space-20: 80px;
 
-  --shadow-focus-iris: rgb(113, 76, 182) 0px 0px 0px 1px inset;
+  /* ---- radii — capsule-first. interactive elements ≥ 8px. ---- */
+  --sc-radius-xs:   6px;     /* small chip, mini badge */
+  --sc-radius-sm:   8px;     /* chip, focus-ring rounding */
+  --sc-radius-md:  12px;     /* input, small button */
+  --sc-radius-lg:  18px;     /* RoleCard, compact card */
+  --sc-radius-xl:  24px;     /* video tile, panel */
+  --sc-radius-2xl: 32px;     /* /start card, hero callout */
+  --sc-radius-full: 999px;   /* pill button, badge, avatar */
 
-  --motion-fast: 0.12s;
-  --motion-base: 0.2s;
-  --motion-slow: 0.3s;
-  --motion-cinematic: 0.6s;
+  /* ---- shadows — soft, cool-tinted ---- */
+  --sc-shadow-xs: 0 1px 2px rgba(20, 22, 38, 0.04);
+  --sc-shadow-sm: 0 2px 6px rgba(20, 22, 38, 0.06), 0 1px 2px rgba(20, 22, 38, 0.04);
+  --sc-shadow-md: 0 8px 24px rgba(20, 22, 38, 0.07), 0 2px 6px rgba(20, 22, 38, 0.04);
+  --sc-shadow-lg: 0 20px 50px rgba(20, 22, 38, 0.10), 0 6px 16px rgba(20, 22, 38, 0.06);
+  --sc-shadow-xl: 0 32px 80px rgba(20, 22, 38, 0.14), 0 12px 30px rgba(20, 22, 38, 0.08);
 
-  --surface-hero: #421d24;
-  --surface-room: #421d24;
-  --surface-canvas: #f2f0eb;
-  --surface-card: #ffffff;
-  --surface-divider: #e3e3e2;
-  --surface-glass: rgba(255, 255, 255, 0.13);
+  /* ---- accent glows — separate from neutral shadows ---- */
+  --sc-glow-sm: 0 0 0 4px rgba(117, 120, 240, 0.16);   /* selected RoleCard, focus halo */
+  --sc-glow-md: 0 8px 24px rgba(117, 120, 240, 0.28), 0 0 0 4px rgba(117, 120, 240, 0.14);
+  --sc-glow-lg: 0 16px 40px rgba(117, 120, 240, 0.32), 0 0 0 6px rgba(117, 120, 240, 0.16);
+
+  /* ---- glass — used selectively (control bar, scrolled nav, chat-rail wash) ---- */
+  --sc-glass-bg: rgba(255, 255, 255, 0.68);
+  --sc-glass-border: rgba(255, 255, 255, 0.55);
+  --sc-glass-shadow: 0 20px 50px rgba(20, 22, 38, 0.10), 0 6px 16px rgba(20, 22, 38, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  --sc-glass-blur: saturate(1.4) blur(20px);
+
+  /* ---- motion durations ---- */
+  --sc-dur-micro:  120ms;    /* hover color swap */
+  --sc-dur-short:  200ms;    /* button press, focus ring fade */
+  --sc-dur-medium: 360ms;    /* drawer/sheet open/close */
+  --sc-dur-long:   520ms;    /* hero entrance, chat-rail width slide */
+
+  /* ---- motion easings ---- */
+  --sc-ease-standard: cubic-bezier(0.32, 0.72, 0, 1);  /* default for almost everything */
+  --sc-ease-entrance: cubic-bezier(0.2, 0.8, 0.2, 1);  /* enter from offscreen */
+  --sc-ease-exit:     cubic-bezier(0.4, 0, 1, 1);      /* exit to offscreen */
 }
+
+/* =====================================================================
+ * 2. tailwind v4 @theme — maps tokens to tailwind utility namespaces.
+ *    `bg-sc-surface`, `text-sc-text-2`, `rounded-sc-xl`, etc. all work.
+ *    spacing: `p-4` = 16px, `gap-6` = 24px (matches --sc-space-* scale).
+ * ===================================================================== */
+@theme inline {
+  /* font — bound to the next/font CSS var declared in `app/layout.tsx`. */
+  --font-sans: "Inter", "Inter Fallback", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+
+  /* colors — every token usable as `bg-sc-X`, `text-sc-X`, `border-sc-X` */
+  --color-sc-bg: var(--sc-bg);
+  --color-sc-surface: var(--sc-surface);
+  --color-sc-surface-2: var(--sc-surface-2);
+  --color-sc-surface-3: var(--sc-surface-3);
+  --color-sc-border: var(--sc-border);
+  --color-sc-border-strong: var(--sc-border-strong);
+  --color-sc-divider: var(--sc-divider);
+  --color-sc-text: var(--sc-text);
+  --color-sc-text-2: var(--sc-text-2);
+  --color-sc-text-3: var(--sc-text-3);
+  --color-sc-text-inverse: var(--sc-text-inverse);
+  --color-sc-accent-300: var(--sc-accent-300);
+  --color-sc-accent-400: var(--sc-accent-400);
+  --color-sc-accent-500: var(--sc-accent-500);
+  --color-sc-accent-600: var(--sc-accent-600);
+  --color-sc-accent-700: var(--sc-accent-700);
+  --color-sc-accent-800: var(--sc-accent-800);
+  --color-sc-accent-soft: var(--sc-accent-soft);
+  --color-sc-accent-soft-2: var(--sc-accent-soft-2);
+  --color-sc-success: var(--sc-success);
+  --color-sc-warning: var(--sc-warning);
+  --color-sc-danger: var(--sc-danger);
+  --color-sc-focus: var(--sc-focus);
+
+  /* radii */
+  --radius-sc-xs: var(--sc-radius-xs);
+  --radius-sc-sm: var(--sc-radius-sm);
+  --radius-sc-md: var(--sc-radius-md);
+  --radius-sc-lg: var(--sc-radius-lg);
+  --radius-sc-xl: var(--sc-radius-xl);
+  --radius-sc-2xl: var(--sc-radius-2xl);
+  --radius-sc-full: var(--sc-radius-full);
+
+  /* shadows */
+  --shadow-sc-xs: var(--sc-shadow-xs);
+  --shadow-sc-sm: var(--sc-shadow-sm);
+  --shadow-sc-md: var(--sc-shadow-md);
+  --shadow-sc-lg: var(--sc-shadow-lg);
+  --shadow-sc-xl: var(--sc-shadow-xl);
+
+  /* spacing — tailwind utilities (p-N, m-N, gap-N) read from these */
+  --spacing-1:  var(--sc-space-1);
+  --spacing-2:  var(--sc-space-2);
+  --spacing-3:  var(--sc-space-3);
+  --spacing-4:  var(--sc-space-4);
+  --spacing-5:  var(--sc-space-5);
+  --spacing-6:  var(--sc-space-6);
+  --spacing-8:  var(--sc-space-8);
+  --spacing-10: var(--sc-space-10);
+  --spacing-12: var(--sc-space-12);
+  --spacing-16: var(--sc-space-16);
+  --spacing-20: var(--sc-space-20);
+}
+
+/* =====================================================================
+ * 3. base
+ * ===================================================================== */
+html { scroll-behavior: smooth; }
 
 body {
-  font-family: var(--font-super-sans-vf);
+  background: var(--sc-bg);
+  color: var(--sc-text);
+  font-family: var(--font-sans);
+  /* inter feature settings — single-storey `a`, alternate stylistic, straight `l` */
+  font-feature-settings: "cv11", "ss01", "cv02";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+/* focus — periwinkle outline always visible. NEVER strip outline without replacement. */
 *:focus-visible {
-  box-shadow: var(--shadow-focus-iris);
-  outline: none;
+  outline: 2px solid var(--sc-focus);
+  outline-offset: 2px;
+  border-radius: var(--sc-radius-sm);
 }
 
+/* =====================================================================
+ * 4. type scale — apply via class names. designed for inter at small sizes.
+ * ===================================================================== */
+.t-display    { font-size: 56px; font-weight: 700; line-height: 1.05; letter-spacing: -0.028em; } /* hero headline only */
+.t-h1         { font-size: 28px; font-weight: 650; line-height: 1.15; letter-spacing: -0.022em; } /* page heading */
+.t-h2         { font-size: 20px; font-weight: 600; line-height: 1.25; letter-spacing: -0.014em; } /* section heading */
+.t-h3         { font-size: 16px; font-weight: 600; line-height: 1.4;  letter-spacing: -0.008em; } /* card heading */
+.t-body       { font-size: 16px; font-weight: 400; line-height: 1.6; }                            /* paragraph body */
+.t-body-sm    { font-size: 14px; font-weight: 400; line-height: 1.5; }                            /* secondary copy */
+.t-label      { font-size: 14px; font-weight: 500; line-height: 1.4; }                            /* form labels, button text */
+.t-meta       { font-size: 12px; font-weight: 500; line-height: 1.4; letter-spacing: 0.02em; }    /* uppercase eyebrow, room id, version */
+
+/* =====================================================================
+ * 5. surface recipes — selective composites. apply as a class.
+ * ===================================================================== */
+
+/* glass — floating control bar, scrolled nav, video-tile overlays.
+ * NOT for cards or content surfaces (use plain --sc-surface). */
+.sc-glass {
+  background: var(--sc-glass-bg);
+  border: 1px solid var(--sc-glass-border);
+  backdrop-filter: var(--sc-glass-blur);
+  -webkit-backdrop-filter: var(--sc-glass-blur);
+  box-shadow: var(--sc-glass-shadow);
+}
+
+/* luminous — primary button fill. periwinkle gradient + inner rim + outer halo.
+ * hover: brightness +2%; active: brightness -5%. handled inline by the button class. */
+.sc-luminous {
+  background: var(--sc-accent-gradient);
+  color: var(--sc-text-inverse);
+  box-shadow:
+    inset 0 1px 0 var(--sc-accent-rim),
+    0 10px 30px rgba(96, 99, 230, 0.30),
+    0 0 0 1px rgba(96, 99, 230, 0.18);
+}
+
+/* feature card — deep periwinkle enclosure with rim highlight + radial wash.
+ * marketing-only. NOT for read-heavy panels. */
+.sc-feature-card {
+  position: relative;
+  background: var(--sc-accent-gradient-deep);
+  color: var(--sc-text-inverse);
+  overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), var(--sc-shadow-lg);
+}
+.sc-feature-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 80% at 18% 0%, rgba(255, 255, 255, 0.22), transparent 55%);
+  pointer-events: none;
+}
+
+/* hero field — single atmospheric gradient block + 96px fade-to-bg safety net.
+ * applied to the wrapping section. children sit above the safety net via z-index. */
+.sc-hero-field {
+  position: relative;
+  background: var(--sc-hero-gradient);
+  color: var(--sc-text-inverse);
+  isolation: isolate;
+}
+.sc-hero-field::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: -1px;
+  height: 96px;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(246, 247, 251, 0) 0%, var(--sc-bg) 100%);
+  z-index: 1;
+}
+.sc-hero-field > * { position: relative; z-index: 2; }
+
+/* footer — deepest atmospheric block. anchors page bottom. */
+.sc-footer-surface { background: var(--sc-footer-gradient); color: var(--sc-text-inverse); }
+
+/* video tile placeholder — neutral cool gradient, reads as "camera feed off". */
+.sc-tile-placeholder { background: linear-gradient(135deg, #e6e8f0 0%, #d4d8e4 100%); }
+
+/* =====================================================================
+ * 6. keyframes
+ * ===================================================================== */
+
+/* cta-icon — used by CtaButton's gradient icon container. slow drift.
+ * (currently disabled on the button to avoid background-position seams.) */
 @keyframes cta-icon-rotate {
-  0% { background-position: 0% 0%; }
+  0%   { background-position: 0% 0%; }
   100% { background-position: 200% 200%; }
+}
+
+/* signing pulse — active deaf-side capture border. 1.4s ease-in-out infinite. */
+@keyframes sc-signing-pulse {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 0.9; }
+}
+.sc-signing-border {
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--sc-accent-500);
+  border-radius: var(--sc-radius-xl);
+  pointer-events: none;
+  animation: sc-signing-pulse 1.4s ease-in-out infinite;
+  box-shadow: 0 0 24px var(--sc-accent-glow-soft);
+}
+
+/* =====================================================================
+ * 7. reduced motion — universal kill switch.
+ *    keeps interactions visible (opacity-only) but eliminates motion.
+ * ===================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+  .sc-signing-border { animation: none !important; }
 }

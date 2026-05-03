@@ -16,6 +16,7 @@ export function NavBar() {
   const { scrollY } = useScroll();
   const [hidden, setHidden] = useState(false);
 
+  // glass over hero (transparent tint), solid bone after scroll
   const bg = useTransform(
     scrollY,
     [0, 120],
@@ -24,12 +25,14 @@ export function NavBar() {
   const borderColor = useTransform(
     scrollY,
     [0, 120],
-    ["rgba(255,255,255,0.18)", "rgba(227,227,226,1)"],
+    ["rgba(255,255,255,0.18)", "rgba(227,230,239,1)"],
   );
   const blur = useTransform(scrollY, [0, 120], ["blur(14px)", "blur(20px)"]);
+  // logo cross-fade — overlay (full color) over hero, solid (gradient silhouette) on light
   const overlayOpacity = useTransform(scrollY, [40, 100], [1, 0]);
   const solidOpacity = useTransform(scrollY, [40, 100], [0, 1]);
 
+  // auto-hide on scroll-down past 160px; show on scroll-up
   useMotionValueEvent(scrollY, "change", (latest) => {
     if (reduce) return;
     const prev = scrollY.getPrevious() ?? 0;
@@ -43,11 +46,11 @@ export function NavBar() {
       initial={false}
       animate={hidden ? { y: -140 } : { y: 0 }}
       transition={{ duration: 0.3, ease: "easeInOut" }}
-      className="fixed top-0 left-0 right-0 z-50 px-12 pt-8"
+      className="fixed top-0 left-0 right-0 z-50 px-3 pt-2"
     >
       <motion.div
         style={{ backgroundColor: bg, backdropFilter: blur, borderColor }}
-        className="mx-auto max-w-[1280px] h-[48px] flex items-center justify-between rounded-pill border px-20 overflow-visible"
+        className="mx-auto flex h-[48px] max-w-[1280px] items-center justify-between overflow-visible rounded-sc-full border px-5"
       >
         <Link
           href="/"
@@ -65,10 +68,10 @@ export function NavBar() {
           </motion.div>
         </Link>
         <Link
-          href="#join"
-          className="inline-flex items-center rounded-pill bg-lavender-chip px-12 py-4 text-body-sm font-semibold text-ink transition-transform duration-150 hover:-translate-y-px"
+          href="/start"
+          className="inline-flex items-center rounded-sc-full bg-sc-accent-soft px-3 py-1 t-label font-semibold text-sc-accent-700 transition-transform duration-150 hover:-translate-y-px"
         >
-          Join a room
+          Start a call
         </Link>
       </motion.div>
     </motion.nav>

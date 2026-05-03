@@ -3,12 +3,12 @@ import { FeatureCard } from "./FeatureCard";
 
 export function FeatureSection() {
   return (
-    <section className="bg-parchment-canvas py-96">
-      <div className="mx-auto max-w-[1200px] px-24 flex flex-col gap-64">
-        <h2 className="text-heading-lg leading-heading-lg tracking-heading-lg font-w540 text-ink max-w-[720px]">
+    <section className="bg-sc-bg py-20">
+      <div className="mx-auto flex max-w-[1200px] flex-col gap-16 px-6">
+        <h2 className="t-display max-w-[720px] text-sc-text">
           One link. Two browsers. No interpreter.
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-24">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <FeatureCard
             icon={<HandWaving size={20} weight="regular" />}
             label="for the deaf signer"

@@ -5,21 +5,36 @@ export interface FeatureCardProps {
   label: string;
   heading: string;
   body: string;
+  variant?: "deep" | "surface";
 }
 
-export function FeatureCard({ icon, label, heading, body }: FeatureCardProps) {
+export function FeatureCard({
+  icon,
+  label,
+  heading,
+  body,
+  variant = "deep",
+}: FeatureCardProps) {
+  if (variant === "deep") {
+    return (
+      <article className="sc-feature-card relative flex flex-col gap-4 rounded-sc-2xl p-8">
+        <div className="relative flex items-center gap-2 text-sc-accent-300">
+          {icon}
+          <span className="t-meta uppercase">{label}</span>
+        </div>
+        <h3 className="relative t-h1 text-white">{heading}</h3>
+        <p className="relative t-body text-white/80">{body}</p>
+      </article>
+    );
+  }
   return (
-    <article className="rounded-card border border-fog bg-bone p-24 flex flex-col gap-16">
-      <div className="flex items-center gap-8 text-iris">
+    <article className="flex flex-col gap-4 rounded-sc-xl border border-sc-border bg-sc-surface p-8 shadow-sc-sm">
+      <div className="flex items-center gap-2 text-sc-accent-600">
         {icon}
-        <span className="text-caption leading-caption font-semibold uppercase tracking-[0.04em]">
-          {label}
-        </span>
+        <span className="t-meta uppercase">{label}</span>
       </div>
-      <h3 className="text-heading-sm leading-heading-sm tracking-heading-sm font-semibold text-ink">
-        {heading}
-      </h3>
-      <p className="text-body leading-body text-graphite">{body}</p>
+      <h3 className="t-h1 text-sc-text">{heading}</h3>
+      <p className="t-body text-sc-text-2">{body}</p>
     </article>
   );
 }

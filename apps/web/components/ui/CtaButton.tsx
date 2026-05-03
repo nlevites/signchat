@@ -14,28 +14,26 @@ export function CtaButton({ href, children, className }: CtaButtonProps) {
     <Link
       href={href}
       className={cn(
-        "group inline-flex items-center gap-12 rounded-cta font-medium transition-transform duration-200 hover:-translate-y-px",
+        "group inline-flex items-center gap-3 rounded-sc-md text-white font-medium transition-transform duration-200 hover:-translate-y-px",
         className,
       )}
       style={{
         padding: "6px 6px 6px 16px",
-        fontSize: "var(--text-body)",
+        fontSize: 16,
         lineHeight: 1,
-        color: "var(--color-bone)",
         background: "linear-gradient(rgb(27,25,56), rgb(27,25,56))",
         boxShadow:
           "rgba(14,18,27,0.24) 0 1px 2px 0, rgb(53,48,136) 0 0 0 1px",
       }}
     >
-      <span style={{ color: "var(--color-bone)" }}>{children}</span>
+      <span>{children}</span>
       <span
         aria-hidden
-        className="inline-grid place-items-center shrink-0"
+        className="inline-grid place-items-center text-white shrink-0"
         style={{
           width: 48,
           height: 36,
           borderRadius: 9,
-          color: "var(--color-bone)",
           background:
             "linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 55%), linear-gradient(135deg, #8b6dff 0%, #5d42d8 55%, #4027a8 100%)",
           boxShadow:
