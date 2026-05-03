@@ -47,6 +47,7 @@ export async function GET(req: Request): Promise<Response> {
       identity,
       name,
       ttl: "1h",
+      metadata: JSON.stringify({ role }),
     });
     at.addGrant({
       roomJoin: true,

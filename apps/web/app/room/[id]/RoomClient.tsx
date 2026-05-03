@@ -8,10 +8,12 @@ import type { Role } from "@signchat/contracts";
 import { Logo } from "@/components/ui/Logo";
 import { ChatPanel } from "@/components/room/ChatPanel";
 import { ControlBar } from "@/components/room/ControlBar";
+import { ConnectionBadge } from "@/components/room/ConnectionBadge";
 import { Lobby, type LobbyDeviceState } from "@/components/room/Lobby";
 import { VideoTile } from "@/components/room/VideoTile";
 import { ViewToggle, type ViewMode } from "@/components/room/ViewToggle";
 import { mintLiveKitToken } from "@/lib/livekit/mint-token";
+import { useLiveKitRoom } from "@/lib/livekit/room";
 import { useRoomStore } from "@/lib/stores";
 import { toast } from "@/lib/stores/toast";
 
@@ -41,7 +43,7 @@ export function RoomClient({ roomId }: RoomClientProps) {
   const name = searchParams.get("name") ?? "guest";
   const identity = useMemo(makeIdentity, []);
   const [joined, setJoined] = useState(false);
-  const [, setDevices] = useState<LobbyDeviceState | null>(null);
+  const [devices, setDevices] = useState<LobbyDeviceState | null>(null);
 
   const setRoomId = useRoomStore((s) => s.setRoomId);
   const setRole = useRoomStore((s) => s.setRole);
@@ -109,7 +111,7 @@ export function RoomClient({ roomId }: RoomClientProps) {
     }
   };
 
-  if (!joined) {
+  if (!joined || !devices) {
     return (
       <Lobby
         roomId={roomId}
@@ -126,6 +128,7 @@ export function RoomClient({ roomId }: RoomClientProps) {
       roomId={roomId}
       displayName={name}
       role={role}
+      devices={devices}
       onLeave={() => router.push("/")}
     />
   );
@@ -135,15 +138,44 @@ interface ActiveRoomProps {
   roomId: string;
   displayName: string;
   role: Role;
+  devices: LobbyDeviceState;
   onLeave: () => void;
 }
 
-function ActiveRoom({ roomId, displayName, role, onLeave }: ActiveRoomProps) {
+function ActiveRoom({
+  roomId,
+  displayName,
+  role,
+  devices,
+  onLeave,
+}: ActiveRoomProps) {
   const [view, setView] = useState<ViewMode>("production");
   const [chatOpen, setChatOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [micEnabled, setMicEnabled] = useState(true);
-  const [camEnabled, setCamEnabled] = useState(true);
+
+  const {
+    localVideoTrack,
+    remoteVideoTrack,
+    remoteAudioTrack,
+    remoteName,
+    remoteRole,
+    micEnabled,
+    camEnabled,
+    toggleMic,
+    toggleCamera,
+    leave,
+  } = useLiveKitRoom({
+    audioInputDeviceId: devices.audioInputDeviceId,
+    videoInputDeviceId: devices.videoInputDeviceId,
+    audioOutputDeviceId: devices.audioOutputDeviceId,
+    initialMicEnabled: devices.micEnabled,
+    initialCamEnabled: devices.camEnabled,
+  });
+
+  const handleLeave = async () => {
+    await leave();
+    onLeave();
+  };
 
   return (
     <main className="flex h-dvh flex-col overflow-hidden bg-sc-bg text-sc-text">
@@ -166,6 +198,7 @@ function ActiveRoom({ roomId, displayName, role, onLeave }: ActiveRoomProps) {
               {roomId}
             </code>
           </div>
+          <ConnectionBadge />
         </div>
         <ViewToggle value={view} onChange={setView} />
       </header>
@@ -174,8 +207,23 @@ function ActiveRoom({ roomId, displayName, role, onLeave }: ActiveRoomProps) {
         <section className="relative flex min-w-0 flex-1 flex-col">
           <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden px-6 pt-6 pb-24">
             <div className="grid h-full max-h-full w-full max-w-[1200px] grid-cols-1 content-center gap-4 md:grid-cols-2">
-              <VideoTile label={`${displayName} · you (${role})`} />
-              <VideoTile empty />
+              <VideoTile
+                label={`${displayName} · you (${role})`}
+                role={role}
+                videoTrack={localVideoTrack}
+                mirrored
+              />
+              {remoteVideoTrack || remoteAudioTrack || remoteName ? (
+                <VideoTile
+                  label={`${remoteName ?? "guest"}${remoteRole ? ` (${remoteRole})` : ""}`}
+                  role={remoteRole}
+                  videoTrack={remoteVideoTrack}
+                  audioTrack={remoteAudioTrack}
+                  audioOutputDeviceId={devices.audioOutputDeviceId}
+                />
+              ) : (
+                <VideoTile empty />
+              )}
             </div>
 
             <ControlBar
@@ -183,11 +231,11 @@ function ActiveRoom({ roomId, displayName, role, onLeave }: ActiveRoomProps) {
               camEnabled={camEnabled}
               chatOpen={chatOpen}
               settingsOpen={settingsOpen}
-              onToggleMic={() => setMicEnabled((v) => !v)}
-              onToggleCam={() => setCamEnabled((v) => !v)}
+              onToggleMic={() => void toggleMic()}
+              onToggleCam={() => void toggleCamera()}
               onToggleChat={() => setChatOpen((v) => !v)}
               onToggleSettings={() => setSettingsOpen((v) => !v)}
-              onLeave={onLeave}
+              onLeave={() => void handleLeave()}
             />
           </div>
 

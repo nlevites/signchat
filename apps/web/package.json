@@ -17,6 +17,7 @@
     "@signchat/sign-pipeline": "workspace:*",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
+    "livekit-client": "2.15.10",
     "livekit-server-sdk": "2.15.0",
     "motion": "12.38.0",
     "next": "16.2.4",
