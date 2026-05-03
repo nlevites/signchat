@@ -1,0 +1,183 @@
+.footer {
+  position: relative;
+  overflow: hidden;
+  padding: 80px 24px 0;
+  background-color: #06040f;
+  color: var(--sc-text-inverse);
+}
+
+.footer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(ellipse 55% 48% at 50% 28%, rgba(95, 72, 135, 0.42) 0%, transparent 62%),
+    radial-gradient(ellipse 70% 55% at 78% 92%, rgba(18, 10, 35, 0.95) 0%, transparent 58%),
+    radial-gradient(ellipse 65% 50% at 15% 88%, rgba(55, 38, 92, 0.55) 0%, transparent 55%),
+    radial-gradient(ellipse 100% 80% at 50% 100%, #030208 0%, transparent 72%),
+    linear-gradient(178deg, #151024 0%, #0a0714 38%, #040208 100%);
+  background-size: 135% 130%, 140% 135%, 138% 132%, 100% 100%, 100% 100%;
+  background-position: 50% 22%, 72% 86%, 18% 84%, 50% 100%, 50% 50%;
+  background-repeat: no-repeat;
+  animation: footer-atmosphere 26s var(--sc-ease-standard) infinite alternate;
+}
+
+@keyframes footer-atmosphere {
+  0% {
+    background-position: 50% 18%, 68% 90%, 22% 80%, 50% 100%, 50% 50%;
+  }
+  50% {
+    background-position: 46% 28%, 54% 84%, 36% 76%, 50% 100%, 50% 50%;
+  }
+  100% {
+    background-position: 54% 22%, 76% 88%, 28% 88%, 50% 100%, 50% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .footer::before {
+    animation: none;
+    background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+    background-position: 50% 22%, 72% 86%, 18% 84%, 50% 100%, 50% 50%;
+  }
+}
+
+.inner {
+  position: relative;
+  z-index: 2;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.top {
+  display: grid;
+  grid-template-columns: minmax(280px, 1.5fr) repeat(2, minmax(160px, 1fr));
+  gap: 56px 48px;
+  align-items: start;
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 320px;
+}
+.brandTagline {
+  font-family: var(--font-sans);
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: rgba(248, 249, 252, 0.72);
+  margin: 0;
+  text-wrap: balance;
+}
+.brandMeta {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(248, 249, 252, 0.42);
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.colHead {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.05px;
+  color: rgba(248, 249, 252, 0.92);
+  margin: 0;
+}
+.colLinks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.colLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.4;
+  color: rgba(248, 249, 252, 0.7);
+  text-decoration: none;
+  transition: color var(--sc-dur-micro) ease;
+}
+.colLink:hover {
+  color: rgba(248, 249, 252, 0.98);
+}
+.colLink:focus-visible {
+  outline: 2px solid var(--sc-accent-300);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+.colLinkIcon {
+  display: inline-flex;
+  color: rgba(248, 249, 252, 0.55);
+  transition: color var(--sc-dur-micro) ease;
+}
+.colLink:hover .colLinkIcon {
+  color: rgba(248, 249, 252, 0.95);
+}
+
+/* full-viewport row so the giant wordmark centers on the window, not inside the
+ * 1200px content column (which made it look visually off-center). */
+.bigmarkWrap {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+  margin-top: 64px;
+}
+
+.bigmark {
+  display: block;
+  flex-shrink: 0;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: clamp(96px, 22vw, 320px);
+  line-height: 0.85;
+  letter-spacing: -0.045em;
+  text-align: center;
+  color: rgba(188, 168, 245, 0.09);
+  user-select: none;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .footer {
+    padding-top: 64px;
+  }
+  .top {
+    grid-template-columns: 1fr 1fr;
+    gap: 40px 32px;
+  }
+  .brand {
+    grid-column: 1 / -1;
+    max-width: none;
+  }
+  .bigmarkWrap {
+    margin-top: 48px;
+  }
+  .bigmark {
+    font-size: clamp(80px, 28vw, 240px);
+  }
+}
+
+@media (max-width: 540px) {
+  .top {
+    grid-template-columns: 1fr;
+  }
+}

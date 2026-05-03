@@ -1,0 +1,189 @@
+/* impact band — sits between the integrations row and the signchat
+ * suite inside the .sc-branded-frame wrapper. names the underserved
+ * audience and the supply gap with cited NIDCD + LSA stats so the
+ * Social Impact Track judges have hard numbers to anchor on. transparent
+ * background — the wrap supplies white. */
+.impact {
+  padding: 80px 24px 64px;
+}
+.inner {
+  max-width: 1000px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 36px;
+  text-align: center;
+}
+
+/* ---- head: eyebrow + heading + lede --------------------------------- */
+.head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  max-width: 760px;
+}
+.eyebrow {
+  display: inline-block;
+  padding: 4px 12px;
+  border: 1px solid #e3e3e2;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #666666;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.heading {
+  font-family: var(--font-sans);
+  font-size: 40px;
+  line-height: 1.05;
+  letter-spacing: -1.05px;
+  font-weight: 600;
+  color: #292827;
+  margin: 0;
+  text-wrap: balance;
+}
+.lede {
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 1.55;
+  color: #4a4558;
+  margin: 0;
+  max-width: 720px;
+  text-wrap: pretty;
+}
+
+/* ---- stats grid: 3 boxed cells matching the integrations + suite
+ * visual rhythm. internal fog dividers connect with the wrap rails. */
+.stats {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  width: 100%;
+  align-items: stretch;
+  border: 1px solid #e3e3e2;
+  background: #ffffff;
+}
+.stats li {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 32px 20px 28px;
+  border-right: 1px solid #e3e3e2;
+}
+.stats li:last-child { border-right: 0; }
+.statNumber {
+  font-family: var(--font-sans);
+  font-size: 44px;
+  line-height: 1.0;
+  letter-spacing: -1.15px;
+  font-weight: 600;
+  color: #714cb6;
+}
+.statCaption {
+  font-size: 17px;
+  line-height: 1.5;
+  font-weight: 500;
+  color: #292827;
+  max-width: 280px;
+  text-align: center;
+}
+.statSource {
+  margin-top: auto;
+  padding-top: 12px;
+  font-size: 12px;
+  color: #714cb6;
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+  transition: opacity var(--sh-motion-base) var(--sh-motion-easing);
+}
+.statSource:hover { opacity: 0.78; }
+
+/* ---- punchline: "Signchat fills the gap." filled with the same
+ * 4-spotlight orbit gradient as the hero CTA icon (violet / pink /
+ * blue / cyan over indigo). text-clipped so the orbit shows only
+ * inside the glyph shapes. reuses the global --sh-spot{1-4}-{x,y}
+ * @property registrations declared in globals.css (the keyframe name
+ * is module-scoped, so this is a separate animation track from
+ * .ctaIcon's even though the property names match).
+ * line-height 1.25 + bottom padding keep `g`/`p` descenders clear of
+ * the text-clip box. */
+@keyframes sc-impact-orbit {
+  0%, 100% {
+    --sh-spot1-x: 68%;  --sh-spot1-y: 50%;
+    --sh-spot2-x: 50%;  --sh-spot2-y: 98%;
+    --sh-spot3-x: 93%;  --sh-spot3-y: 50%;
+    --sh-spot4-x: 50%;  --sh-spot4-y: 75%;
+  }
+  25% {
+    --sh-spot1-x: 52%;  --sh-spot1-y: 97%;
+    --sh-spot2-x: 43%;  --sh-spot2-y: 57%;
+    --sh-spot3-x: 56%;  --sh-spot3-y: 36%;
+    --sh-spot4-x: 90%;  --sh-spot4-y: 54%;
+  }
+  50% {
+    --sh-spot1-x: 32%;  --sh-spot1-y: 50%;
+    --sh-spot2-x: 50%;  --sh-spot2-y:  2%;
+    --sh-spot3-x:  7%;  --sh-spot3-y: 50%;
+    --sh-spot4-x: 50%;  --sh-spot4-y: 25%;
+  }
+  75% {
+    --sh-spot1-x: 47%;  --sh-spot1-y:  3%;
+    --sh-spot2-x: 57%;  --sh-spot2-y: 43%;
+    --sh-spot3-x: 44%;  --sh-spot3-y: 64%;
+    --sh-spot4-x: 10%;  --sh-spot4-y: 46%;
+  }
+}
+.punchline {
+  position: relative;
+  display: inline-block;
+  font-family: var(--font-sans);
+  font-size: 56px;
+  line-height: 1.25;
+  letter-spacing: -1.40px;
+  font-weight: 700;
+  margin: 24px 0 0;
+  padding: 0.1em 0.05em 0.18em;
+  background-image:
+    radial-gradient(circle at var(--sh-spot1-x, 68%) var(--sh-spot1-y, 50%),
+      rgba(133, 125, 250, 0.95) 0px, transparent 50%),
+    radial-gradient(circle at var(--sh-spot2-x, 50%) var(--sh-spot2-y, 98%),
+      rgba(255,  51, 102, 0.95) 0px, transparent 50%),
+    radial-gradient(circle at var(--sh-spot3-x, 93%) var(--sh-spot3-y, 50%),
+      rgba( 75, 105, 227, 0.85) 0px, transparent 50%),
+    radial-gradient(circle at var(--sh-spot4-x, 50%) var(--sh-spot4-y, 75%),
+      rgba(104, 222, 255, 0.85) 0px, transparent 50%),
+    linear-gradient(rgb(85, 77, 203), rgb(74, 67, 176));
+  -webkit-background-clip: text;
+          background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: sc-impact-orbit 10s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .punchline { animation: none !important; }
+}
+
+/* ---- responsive ---------------------------------------------------- */
+@media (max-width: 768px) {
+  .impact { padding: 56px 20px 48px; }
+  .heading { font-size: 28px; letter-spacing: -0.62px; }
+  .lede { font-size: 16px; }
+  .stats { flex-direction: column; }
+  .stats li {
+    border-right: 0;
+    border-bottom: 1px solid #e3e3e2;
+    padding: 24px 20px;
+  }
+  .stats li:last-child { border-bottom: 0; }
+  .statNumber { font-size: 36px; }
+  .statCaption { font-size: 16px; }
+  .punchline { font-size: 40px; letter-spacing: -0.92px; line-height: 1.2; }
+}

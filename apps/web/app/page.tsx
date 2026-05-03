@@ -1,14 +1,18 @@
-import { NavBar } from "@/components/landing/NavBar";
-import { Hero } from "@/components/landing/Hero";
-import { FeatureSection } from "@/components/landing/FeatureSection";
+import { HeroHeader } from "@/components/landing/HeroHeader";
+import { IntegrationsBand } from "@/components/landing/HeroHeader/IntegrationsBand";
+import { ImpactBand } from "@/components/landing/ImpactBand";
+import { SignchatSuite } from "@/components/landing/SignchatSuite";
 import { Footer } from "@/components/landing/Footer";
 
 export default function Home() {
   return (
     <>
-      <NavBar />
-      <Hero />
-      <FeatureSection />
+      <HeroHeader />
+      <div className="sc-branded-frame">
+        <IntegrationsBand />
+        <ImpactBand />
+        <SignchatSuite />
+      </div>
       <Footer />
     </>
   );

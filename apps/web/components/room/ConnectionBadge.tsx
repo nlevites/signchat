@@ -12,11 +12,11 @@ const LABEL: Record<ConnectionState, string> = {
 };
 
 const DOT: Record<ConnectionState, string> = {
-  idle: "bg-white/40",
-  connecting: "bg-white/70 animate-pulse",
-  connected: "bg-emerald-300",
-  reconnecting: "bg-amber-300 animate-pulse",
-  disconnected: "bg-rose-400",
+  idle: "bg-sc-text-3/50",
+  connecting: "bg-sc-accent-500 animate-pulse",
+  connected: "bg-emerald-500",
+  reconnecting: "bg-amber-400 animate-pulse",
+  disconnected: "bg-rose-500",
 };
 
 export function ConnectionBadge() {
@@ -25,7 +25,7 @@ export function ConnectionBadge() {
     <span
       role="status"
       aria-live="polite"
-      className="inline-flex items-center gap-2 rounded-sc-full bg-white/10 px-3 py-1 text-[12px] font-medium text-white/90"
+      className="inline-flex items-center gap-2 rounded-sc-full border border-sc-border bg-sc-surface-2 px-3 py-1 text-[12px] font-medium text-sc-text"
     >
       <span aria-hidden className={`size-2 rounded-full ${DOT[state]}`} />
       {LABEL[state]}
