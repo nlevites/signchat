@@ -1,10 +1,15 @@
+import { NavBar } from "@/components/landing/NavBar";
+import { Hero } from "@/components/landing/Hero";
+import { FeatureSection } from "@/components/landing/FeatureSection";
+import { Footer } from "@/components/landing/Footer";
+
 export default function Home() {
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center gap-2">
-      <h1 className="text-display leading-display tracking-display font-semibold">
-        Signchat
-      </h1>
-      <p className="text-caption leading-caption text-graphite">BeaverHacks 2026</p>
-    </main>
+    <>
+      <NavBar />
+      <Hero />
+      <FeatureSection />
+      <Footer />
+    </>
   );
 }
