@@ -34,10 +34,10 @@ interface PreferencesState {
 }
 
 const DEFAULT_THRESHOLDS: PreferenceThresholds = {
-  top1Threshold: 0.5,
-  top2Threshold: 0.3,
-  silenceMs: 2000,
-  intervalMs: 500,
+  top1Threshold: 0.3,
+  top2Threshold: 0.15,
+  silenceMs: 500,
+  intervalMs: 200,
   autoStartThreshold: 0.25,
   autoStopThreshold: 0.03,
 };
@@ -66,7 +66,7 @@ export const usePreferencesStore = create<PreferencesState>()(
     }),
     {
       name: "signchat:preferences",
-      version: 5,
+      version: 6,
       // v1 → v2: backfill the new auto-mode thresholds with defaults so
       // returning users don't end up with undefined fields driving the
       // confidence-streak detection.
@@ -79,6 +79,10 @@ export const usePreferencesStore = create<PreferencesState>()(
       // Anyone still on the old auto-assigned default
       // (google/gemini-3-flash-preview) gets migrated; explicit picks of
       // the other two enumerated models are preserved.
+      // v5 → v6: retune auto-mode threshold defaults toward a more
+      // responsive baseline (lower top-k, shorter silence/interval).
+      // Force-migrate everyone — their previously tuned values are
+      // discarded so dashboards reflect the new shipped baseline.
       migrate: (persisted, version) => {
         if (!persisted || typeof persisted !== "object") {
           return persisted as PreferencesState;
@@ -113,6 +117,9 @@ export const usePreferencesStore = create<PreferencesState>()(
           if (s.modelId === "google/gemini-3-flash-preview") {
             s = { ...s, modelId: "openai/gpt-5.4-mini" };
           }
+        }
+        if (version < 6) {
+          s = { ...s, thresholds: { ...DEFAULT_THRESHOLDS } };
         }
         return s as PreferencesState;
       },
