@@ -209,7 +209,7 @@ export function Lobby({ roomId, displayName, role, onJoin, onCancel }: LobbyProp
           <div className="sc-tile-placeholder relative aspect-[4/3] w-full overflow-hidden rounded-sc-2xl border border-sc-border shadow-sc-md">
             <video
               ref={videoRef}
-              className="absolute inset-0 size-full object-cover"
+              className="absolute inset-0 size-full -scale-x-100 object-cover"
               autoPlay
               playsInline
               muted
