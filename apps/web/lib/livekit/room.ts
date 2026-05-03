@@ -5,6 +5,7 @@ import {
   type LocalAudioTrack,
   type LocalVideoTrack,
   LogLevel,
+  type Participant,
   type RemoteAudioTrack,
   type RemoteParticipant,
   type RemoteTrack,
@@ -14,6 +15,7 @@ import {
   RoomEvent,
   setLogLevel,
   Track,
+  type TrackPublication,
 } from "livekit-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
@@ -51,6 +53,10 @@ export interface LiveKitRoomState {
   remoteRole: Role | null;
   micEnabled: boolean;
   camEnabled: boolean;
+  /** remote participant's mic enabled state. null until they connect; true /
+   * false thereafter, driven by TrackMuted/TrackUnmuted + track presence. */
+  remoteMicEnabled: boolean | null;
+  remoteCamEnabled: boolean | null;
   toggleMic: () => Promise<void>;
   toggleCamera: () => Promise<void>;
   leave: () => Promise<void>;
@@ -139,6 +145,8 @@ export function useLiveKitRoom(args: UseLiveKitRoomArgs): LiveKitRoomState {
   const [remoteRole, setRemoteRole] = useState<Role | null>(null);
   const [micEnabled, setMicEnabled] = useState(args.initialMicEnabled);
   const [camEnabled, setCamEnabled] = useState(args.initialCamEnabled);
+  const [remoteMicEnabled, setRemoteMicEnabled] = useState<boolean | null>(null);
+  const [remoteCamEnabled, setRemoteCamEnabled] = useState<boolean | null>(null);
 
   // seeds for the first connect — referenced from inside the effect below so
   // that mid-call device changes don't trigger a reconnect.
@@ -198,6 +206,11 @@ export function useLiveKitRoom(args: UseLiveKitRoomArgs): LiveKitRoomState {
       remoteAudioSidRef.current = audioTrack?.sid ?? null;
       setRemoteVideoTrack(videoTrack);
       setRemoteAudioTrack(audioTrack);
+      // remote enabled state = published AND not muted. when the publisher
+      // disables a source, livekit fires TrackMuted; when they re-enable,
+      // TrackUnmuted. between those events the publication remains.
+      setRemoteCamEnabled(videoPub ? !videoPub.isMuted : false);
+      setRemoteMicEnabled(audioPub ? !audioPub.isMuted : false);
     };
     const clearRemote = () => {
       remoteIdentityRef.current = null;
@@ -209,6 +222,8 @@ export function useLiveKitRoom(args: UseLiveKitRoomArgs): LiveKitRoomState {
       setRemoteVideoTrack(null);
       setRemoteAudioTrack(null);
       setRemoteParticipant(null);
+      setRemoteMicEnabled(null);
+      setRemoteCamEnabled(null);
     };
 
     const onConnectionStateChanged = (state: LKConnectionState) => {
@@ -220,17 +235,32 @@ export function useLiveKitRoom(args: UseLiveKitRoomArgs): LiveKitRoomState {
     };
     const onTrackSubscribed = (
       track: RemoteTrack,
-      _pub: RemoteTrackPublication,
+      pub: RemoteTrackPublication,
       participant: RemoteParticipant,
     ) => {
       remoteIdentityRef.current = participant.identity;
       if (track.kind === Track.Kind.Video) {
         remoteVideoSidRef.current = track.sid ?? null;
         setRemoteVideoTrack(track as RemoteVideoTrack);
+        setRemoteCamEnabled(!pub.isMuted);
       } else if (track.kind === Track.Kind.Audio) {
         remoteAudioSidRef.current = track.sid ?? null;
         setRemoteAudioTrack(track as RemoteAudioTrack);
+        setRemoteMicEnabled(!pub.isMuted);
       }
+    };
+    /* TrackMuted / TrackUnmuted fire for BOTH local and remote publications;
+     * the participant arg is the publisher. we only care about the active
+     * remote, identified via remoteIdentityRef.  */
+    const onTrackMuted = (pub: TrackPublication, participant: Participant) => {
+      if (participant.identity !== remoteIdentityRef.current) return;
+      if (pub.kind === Track.Kind.Video) setRemoteCamEnabled(false);
+      else if (pub.kind === Track.Kind.Audio) setRemoteMicEnabled(false);
+    };
+    const onTrackUnmuted = (pub: TrackPublication, participant: Participant) => {
+      if (participant.identity !== remoteIdentityRef.current) return;
+      if (pub.kind === Track.Kind.Video) setRemoteCamEnabled(true);
+      else if (pub.kind === Track.Kind.Audio) setRemoteMicEnabled(true);
     };
     // Only clear state when the unsubscribed track is the one currently held.
     // When the deaf side swaps mic -> signchat-voice, livekit fires
@@ -264,6 +294,8 @@ export function useLiveKitRoom(args: UseLiveKitRoomArgs): LiveKitRoomState {
     r.on(RoomEvent.ParticipantDisconnected, onParticipantDisconnected);
     r.on(RoomEvent.TrackSubscribed, onTrackSubscribed);
     r.on(RoomEvent.TrackUnsubscribed, onTrackUnsubscribed);
+    r.on(RoomEvent.TrackMuted, onTrackMuted);
+    r.on(RoomEvent.TrackUnmuted, onTrackUnmuted);
     r.on(RoomEvent.LocalTrackPublished, onLocalTrackPublished);
     r.on(RoomEvent.LocalTrackUnpublished, onLocalTrackUnpublished);
     r.on(RoomEvent.Disconnected, onDisconnected);
@@ -318,6 +350,8 @@ export function useLiveKitRoom(args: UseLiveKitRoomArgs): LiveKitRoomState {
       r.off(RoomEvent.ParticipantDisconnected, onParticipantDisconnected);
       r.off(RoomEvent.TrackSubscribed, onTrackSubscribed);
       r.off(RoomEvent.TrackUnsubscribed, onTrackUnsubscribed);
+      r.off(RoomEvent.TrackMuted, onTrackMuted);
+      r.off(RoomEvent.TrackUnmuted, onTrackUnmuted);
       r.off(RoomEvent.LocalTrackPublished, onLocalTrackPublished);
       r.off(RoomEvent.LocalTrackUnpublished, onLocalTrackUnpublished);
       r.off(RoomEvent.Disconnected, onDisconnected);
@@ -390,6 +424,8 @@ export function useLiveKitRoom(args: UseLiveKitRoomArgs): LiveKitRoomState {
     remoteRole,
     micEnabled,
     camEnabled,
+    remoteMicEnabled,
+    remoteCamEnabled,
     toggleMic,
     toggleCamera,
     leave,

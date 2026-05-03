@@ -5,6 +5,8 @@ import {
   Copy,
   Ear,
   HandWaving,
+  MicrophoneSlash,
+  UserCircle,
   VideoCameraSlash,
 } from "@phosphor-icons/react/dist/ssr";
 import type {
@@ -55,6 +57,17 @@ interface VideoTileProps {
   inviteRoomCode?: string;
   /** Full shareable URL copied to the clipboard from the empty waiting state. */
   inviteUrl?: string;
+  /** Show a small "Connected" pill at top-left when this tile holds a real
+   * participant (local: always true once joined; remote: true once their
+   * identity is known). null/undefined hides the badge. */
+  connected?: boolean;
+  /** Drives the on-tile mic-off / camera-off chips. when false, both users
+   * see this tile is muted / camera-off. defaults to true (no chip). */
+  micOn?: boolean;
+  camOn?: boolean;
+  /** Click handler — used by the room layout to swap the main tile and the
+   * PiP. when set, the tile gets cursor:pointer and reacts to Enter/Space. */
+  onClick?: () => void;
 }
 
 export function VideoTile({
@@ -72,6 +85,10 @@ export function VideoTile({
   showDeafCaption = false,
   inviteRoomCode,
   inviteUrl,
+  connected,
+  micOn = true,
+  camOn = true,
+  onClick,
 }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -190,11 +207,34 @@ export function VideoTile({
   const hearingDisplayText =
     hearingPartialText ?? hearingFinalWithinHold?.text ?? null;
 
-  const showVideo = !!videoTrack;
+  // a tile renders the live video only when the track is present AND the
+  // publisher has the camera on. when they toggle camera off mid-call we
+  // still hold the muted track but should swap to the avatar placeholder
+  // so the other side can see the camera is intentionally off.
+  const showVideo = !!videoTrack && camOn !== false;
   const showCameraOff = !empty && !showVideo;
+  const showMicOff = !empty && !micOn;
+
+  const interactive = !!onClick;
+  const Tag = (interactive ? "button" : "div") as "button" | "div";
+  const interactiveProps = interactive
+    ? {
+        type: "button" as const,
+        onClick,
+        "aria-label": label ? `Expand ${label}'s tile` : "Expand tile",
+      }
+    : {};
 
   return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-sc-xl border border-sc-border bg-[var(--sc-hero-deep)] shadow-sc-md">
+    <Tag
+      {...interactiveProps}
+      className={
+        "group relative aspect-video w-full overflow-hidden rounded-sc-xl border border-sc-border bg-[var(--sc-hero-deep)] text-left shadow-sc-md transition-shadow duration-200 " +
+        (interactive
+          ? "cursor-pointer hover:shadow-sc-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sc-focus"
+          : "")
+      }
+    >
       <div className="sc-tile-placeholder absolute inset-0" />
       {showVideo ? (
         <video
@@ -225,10 +265,34 @@ export function VideoTile({
         </div>
       ) : null}
       {showCameraOff ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/85">
-          <VideoCameraSlash size={28} weight="fill" />
-          <span className="t-body-sm">Camera off</span>
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[var(--sc-hero-deep)]/85 text-white/85">
+          <UserCircle size={64} weight="duotone" />
+          <span className="t-body-sm font-medium">Camera off</span>
+          {label ? (
+            <span className="t-meta uppercase text-white/55">{label}</span>
+          ) : null}
         </div>
+      ) : null}
+      {connected && !empty ? (
+        <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-sc-full bg-emerald-500/90 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">
+          <span aria-hidden className="inline-block size-1.5 rounded-full bg-white" />
+          Connected
+        </span>
+      ) : null}
+      {showMicOff ? (
+        <span className="absolute top-3 right-3 inline-flex items-center gap-1.5 rounded-sc-full bg-rose-500/90 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">
+          <MicrophoneSlash size={11} weight="fill" />
+          Muted
+        </span>
+      ) : null}
+      {showVideo && !camOn ? null : null}
+      {/* fallback explicit small camera-off chip when the avatar
+        * placeholder is suppressed (e.g. for local PiP shrunk states). */}
+      {!showVideo && !empty ? (
+        <span className="absolute right-3 bottom-3 inline-flex items-center gap-1.5 rounded-sc-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">
+          <VideoCameraSlash size={11} weight="fill" />
+          Camera off
+        </span>
       ) : null}
       {captionsDegradedChip ? (
         <div className="absolute top-3 right-3 inline-flex items-center gap-1.5 rounded-sc-full bg-sc-warning/90 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">
@@ -284,7 +348,7 @@ export function VideoTile({
           {label}
         </div>
       ) : null}
-    </div>
+    </Tag>
   );
 }
 
