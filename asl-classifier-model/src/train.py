@@ -43,14 +43,33 @@ from pathlib import Path
 # fall back to the standard layer_norm kernels which work on GPU.
 os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
 
+# Cap TF / OpenMP / BLAS thread pools BEFORE importing TF. RunPod H200 hosts
+# expose 100+ vCPUs to the container; TF defaults to one thread per core for
+# both intra- and inter-op pools, then CUDA PTX JIT and tf.data prefetchers
+# layer their own threads on top. The combined fan-out exceeds the
+# container's RLIMIT_NPROC and crashes with
+# "Thread tf_ creation via pthread_create() failed (errno 11)" partway into
+# the first XLA-compiled train step. These caps are conservative; the model
+# is GPU-bound (~1.7 M params, batch=512 on H200) so the host CPU thread
+# pool is not on the perf-critical path.
+os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "8")
+os.environ.setdefault("TF_NUM_INTEROP_THREADS", "2")
+os.environ.setdefault("OMP_NUM_THREADS", "8")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "8")
+os.environ.setdefault("MKL_NUM_THREADS", "8")
+
 import tensorflow as tf
+
+tf.config.threading.set_intra_op_parallelism_threads(
+    int(os.environ["TF_NUM_INTRAOP_THREADS"]))
+tf.config.threading.set_inter_op_parallelism_threads(
+    int(os.environ["TF_NUM_INTEROP_THREADS"]))
 
 # Speedup stack (Hopper-class GPUs only; safe no-op on M4 metal / CPU smoke).
 _gpus = tf.config.list_physical_devices("GPU")
 if _gpus:
     tf.keras.mixed_precision.set_global_policy("mixed_bfloat16")
-    tf.config.optimizer.set_jit(True)
-    print(f"[train] enabled bf16 mixed precision + XLA JIT "
+    print(f"[train] enabled bf16 mixed precision "
           f"({len(_gpus)} GPU(s) detected)")
 
 import tensorflow_addons as tfa
@@ -201,14 +220,28 @@ def main():
                 print(f"[train] WARN resume failed ({e}); training from scratch")
 
     label_smoothing = float(train_cfg.get("label_smoothing", 0.1))
+    # XLA jit_compile=True is incompatible with tfa.optimizers.Lookahead +
+    # tfa.optimizers.RectifiedAdam under TF 2.15: RectifiedAdam creates its
+    # `sma_threshold` resource lazily inside a tf.cond on the CPU during the
+    # first apply_gradients, then XLA strict device placement fails when the
+    # GPU train step tries to read it. (See
+    # https://www.tensorflow.org/xla/known_issues#tfvariable_on_a_different_device
+    # and https://github.com/tensorflow/addons/issues/2381.) bf16 mixed
+    # precision + Hopper tensor cores still give us most of the speedup.
     model.compile(
         optimizer=optimizer,
         loss=tf.keras.losses.CategoricalCrossentropy(
             from_logits=True, label_smoothing=label_smoothing,
         ),
         metrics=[tf.keras.metrics.CategoricalAccuracy(name="acc")],
-        steps_per_execution=steps_per_epoch,
-        jit_compile=bool(_gpus),
+        # steps_per_execution > 1 fuses N steps into a single tf.function call
+        # (~5-10% speedup on H200) but suppresses per-step metric writes,
+        # which makes the epoch-end log show loss=0 / acc=0 in some
+        # tf-2.15 + AWP combinations. 16 is a safe middle ground:
+        # still fuses enough to amortize tf.function overhead, but reports
+        # metrics often enough to detect divergence early in long runs.
+        steps_per_execution=16,
+        jit_compile=False,
     )
 
     # Callbacks.
@@ -234,11 +267,14 @@ def main():
         str(out_dir / "logs.csv"), append=False,
     ))
 
+    val_n = meta.get("n_val_signer") or meta.get("n_val") or 0
+    val_steps = max(1, val_n // batch_size) if val_n else None
     history = model.fit(
         datasets["train"],
         validation_data=monitor_ds,
         epochs=epochs,
         steps_per_epoch=steps_per_epoch,
+        validation_steps=val_steps,
         callbacks=callbacks,
         verbose=2,
     )
@@ -288,8 +324,21 @@ def main():
         # for val_signer; we additionally evaluate val explicitly if both exist.
         if datasets.get("val_signer") is not None and monitor_ds is datasets.get("val_signer"):
             val_signer_acc = float(history.history.get("val_acc", [0.0])[-1])
+            # base_model is the inner Keras Model whose AWP wrapper handled
+            # compilation; explicit evaluate(base_model) hits "model not
+            # compiled". Recompile with the same loss/metrics for the eval
+            # pass; weights are already trained.
             try:
-                results = base_model.evaluate(datasets["val"], verbose=0, return_dict=True)
+                base_model.compile(
+                    loss=tf.keras.losses.CategoricalCrossentropy(
+                        from_logits=True, label_smoothing=label_smoothing,
+                    ),
+                    metrics=[tf.keras.metrics.CategoricalAccuracy(name="acc")],
+                )
+                results = base_model.evaluate(
+                    datasets["val"], verbose=0, return_dict=True,
+                    steps=max(1, meta.get("n_val", 0) // batch_size) or None,
+                )
                 val_acc = float(results.get("acc", 0.0))
             except Exception as e:
                 print(f"[train] WARN explicit val eval failed: {e}")

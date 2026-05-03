@@ -282,7 +282,7 @@ def build_datasets(cfg: dict) -> dict:
         ).prefetch(tf.data.AUTOTUNE)
 
     train_ds = _make_element_ds(train, cfg, training=True, seed=seed)
-    train_ds = _pad(train_ds, drop_remainder=True)
+    train_ds = _pad(train_ds, drop_remainder=True).repeat()
 
     val_ds = None
     if val:
