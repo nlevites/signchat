@@ -1,20 +1,30 @@
-"""Training entrypoint.
+"""Training entrypoint for the hoyso48 1st-place asl-signs port.
 
 Usage:
     python -m src.train --config configs/pretrain_phase1_kaggle.yaml
-    python -m src.train --config configs/pretrain_phase1_broad.yaml
+    python -m src.train --config configs/pretrain_phase1_kaggle.yaml --epochs 5
+    python -m src.train --config configs/pretrain_phase1_kaggle.yaml --batch-size 256
 
-Each run:
-  - Loads cached landmark .npy files via src.data.tfrecords.build_datasets
-  - Builds the model named in cfg.model.name
-  - Optionally resumes weights from cfg.train.resume_from
-  - Trains, evaluates on val + held-out signer
-  - Saves to a stable directory:
-        pretrained/<experiment.name>/   if cfg.experiment.kind == "pretrain"
-        checkpoints/<experiment.name>/  otherwise
-    Re-running the same experiment.name overwrites the previous artifacts on
-    disk; full run history with metrics lives in experiments.csv (one row per
-    run, keyed by timestamped run_id).
+What it does (faithful port of cell 18 of the reference notebook):
+
+  1. Sets bf16 mixed precision + XLA JIT (Hopper-class GPUs only).
+  2. Loads the .npy cache via ``src.data.tfrecords.build_datasets`` -> raw
+     (T, 543, 3) -> filter NaNs -> augment_fn -> Preprocess -> padded_batch.
+  3. Builds the AWP-wrapped Conv1D-Transformer, ``dim=192`` by default.
+  4. Schedule: OneCycleLR (warmup_type=linear, decay_type=cosine), peak lr
+     applied to BOTH the LR and the weight_decay so wd follows the same shape.
+  5. Optimizer: tfa.optimizers.Lookahead(tfa.optimizers.RectifiedAdam(...,
+     sma_threshold=4), sync_period=5).
+  6. Loss: CategoricalCrossentropy(from_logits=True, label_smoothing=0.1).
+  7. Train + val per epoch, best-on-val_acc checkpoint, optional Snapshot
+     callback every snapshot_epoch.
+
+Outputs land in:
+    pretrained/<experiment.name>/best.weights.h5      # best val_acc snapshot
+    pretrained/<experiment.name>/last.weights.h5      # last epoch
+    pretrained/<experiment.name>/saved_model/         # full TF SavedModel
+    pretrained/<experiment.name>/vocab.json           # I/O sidecar
+    pretrained/<experiment.name>/temperature.json     # placeholder T=1.0
 """
 
 from __future__ import annotations
@@ -36,12 +46,6 @@ os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
 import tensorflow as tf
 
 # Speedup stack (Hopper-class GPUs only; safe no-op on M4 metal / CPU smoke).
-# - bf16 mixed precision: ~2x throughput on H100/H200 tensor cores. Same
-#   exponent range as fp32 so no loss-scaling needed (unlike fp16). Final
-#   softmax stays fp32 via dtype="float32" on the last Dense (see model.py).
-# - XLA JIT: op fusion + graph compile. Set globally here AND redundantly
-#   enabled per-model via jit_compile=True in compile() so SavedModel export
-#   bakes the same compilation in.
 _gpus = tf.config.list_physical_devices("GPU")
 if _gpus:
     tf.keras.mixed_precision.set_global_policy("mixed_bfloat16")
@@ -49,69 +53,34 @@ if _gpus:
     print(f"[train] enabled bf16 mixed precision + XLA JIT "
           f"({len(_gpus)} GPU(s) detected)")
 
+import tensorflow_addons as tfa
+
+from .awp import AWP
 from .config import load_config
 from .data.tfrecords import build_datasets
-from .model import build_classifier
+from .landmarks import CHANNELS
+from .model import get_model
+from .onecycle import OneCycleLR
 
 
 def _make_run_id(cfg: dict) -> str:
-    """Unique identifier for the experiments.csv log row (NOT the disk dir)."""
     return f"{cfg['experiment']['name']}_{int(time.time())}"
 
 
 def _resolve_out_dir(cfg: dict) -> Path:
-    """Stable on-disk directory for the run's checkpoints + saved_model.
-
-    Routing:
-      - cfg.experiment.kind == "pretrain"  ->  pretrained/<experiment.name>/
-      - anything else                       ->  checkpoints/<experiment.name>/
-
-    No timestamp in the path: re-running with the same `experiment.name`
-    overwrites the previous artifacts. This makes downstream `resume_from`
-    references stable strings rather than guessable timestamps.
-    """
     name = cfg["experiment"]["name"]
     kind = cfg["experiment"].get("kind", "experiment")
     root = Path("pretrained") if kind == "pretrain" else Path("checkpoints")
     return root / name
 
 
-def _build_optimizer(cfg: dict, steps_per_epoch: int) -> tf.keras.optimizers.Optimizer:
-    train_cfg = cfg["train"]
-    base_lr = float(train_cfg["lr"])
-    epochs = int(train_cfg["epochs"])
-    warmup_epochs = int(train_cfg.get("warmup_epochs", 0))
-    schedule_name = train_cfg.get("schedule", "constant")
-
-    total_steps = max(1, epochs * max(1, steps_per_epoch))
-    warmup_steps = max(1, warmup_epochs * max(1, steps_per_epoch))
-
-    if schedule_name == "cosine":
-        decay = tf.keras.optimizers.schedules.CosineDecay(
-            initial_learning_rate=base_lr,
-            decay_steps=total_steps - warmup_steps,
-            alpha=0.01,
-            warmup_target=base_lr,
-            warmup_steps=warmup_steps,
-        )
-        lr = decay
-    else:
-        lr = base_lr
-
-    return tf.keras.optimizers.AdamW(
-        learning_rate=lr,
-        weight_decay=float(train_cfg.get("weight_decay", 0.0)),
-    )
-
-
-def _benchmark_latency(model: tf.keras.Model, cfg: dict, n: int = 50) -> float:
-    feats = tf.zeros((1, cfg["data"]["max_len"], cfg["data"]["n_landmarks"], cfg["data"]["n_channels"]))
-    mask = tf.ones((1, cfg["data"]["max_len"]), dtype=tf.bool)
+def _benchmark_latency(model: tf.keras.Model, max_len: int, n: int = 50) -> float:
+    feats = tf.fill((1, max_len, CHANNELS), 0.0)
     for _ in range(5):
-        model([feats, mask], training=False)
+        model(feats, training=False)
     t0 = time.time()
     for _ in range(n):
-        model([feats, mask], training=False)
+        model(feats, training=False)
     return (time.time() - t0) / n * 1000.0
 
 
@@ -130,13 +99,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True)
     parser.add_argument("--batch-size", type=int, default=None,
-                        help="override cfg.train.batch_size (used by runpod_train.py "
-                             "to pick a per-GPU batch via BATCH_BY_GPU)")
+                        help="override cfg.train.batch_size")
     parser.add_argument("--epochs", type=int, default=None,
-                        help="override cfg.train.epochs. Used for short smoke "
-                             "runs (e.g. --epochs 3 on the broad config to validate "
-                             "a recipe change for ~$3 instead of paying for a full "
-                             "60-epoch ~$25 broad run).")
+                        help="override cfg.train.epochs (use --epochs 5 for a smoke)")
     args = parser.parse_args()
 
     cfg = load_config(args.config)
@@ -152,78 +117,101 @@ def main():
     run_id = _make_run_id(cfg)
     out_dir = _resolve_out_dir(cfg)
     out_dir.mkdir(parents=True, exist_ok=True)
-
     print(f"[train] run_id={run_id}")
     print(f"[train] config={args.config}")
     print(f"[train] out_dir={out_dir}")
 
+    # Build datasets + meta.
     datasets = build_datasets(cfg)
     meta = datasets["meta"]
-    print(f"[train] data: train={meta['n_train']} "
-          f"val={meta['n_val']} val_signer={meta['n_val_signer']}")
-    if meta.get("train_balanced"):
-        breakdown = ", ".join(
-            f"{s['source']}={s['n_train']}" for s in meta.get("train_sources", [])
-        )
-        print(f"[train] train pipeline: per-source balanced sampling "
-              f"(equal weights) -> {breakdown}")
-    elif meta.get("train_sources"):
-        breakdown = ", ".join(
-            f"{s['source']}={s['n_train']}" for s in meta["train_sources"]
-        )
-        print(f"[train] train pipeline: single-source -> {breakdown}")
+    num_classes = meta["num_classes"]
+    max_len = meta["max_len"]
+    print(f"[train] data: train={meta['n_train']} val={meta['n_val']} "
+          f"val_signer={meta['n_val_signer']} | classes={num_classes} max_len={max_len}")
 
-    num_classes = len(datasets["meta"]["vocab"])
-    model = build_classifier(
-        num_classes=num_classes,
-        name=cfg["model"]["name"],
-        max_len=cfg["data"]["max_len"],
-        n_landmarks=cfg["data"]["n_landmarks"],
-        n_channels=cfg["data"].get("n_channels", 6),
-        dim=cfg["model"]["dim"],
-        n_blocks=cfg["model"].get("n_blocks", 4),
-        n_heads=cfg["model"].get("n_heads", 4),
-        conv_kernel=cfg["model"].get("conv_kernel", 17),
-        ffn_expansion=cfg["model"].get("ffn_expansion", 4),
-        dropout=cfg["model"].get("dropout", 0.2),
+    # Schedule + optimizer.
+    train_cfg = cfg["train"]
+    batch_size = int(train_cfg["batch_size"])
+    epochs = int(train_cfg["epochs"])
+    base_lr = float(train_cfg["lr"])
+    weight_decay = float(train_cfg.get("weight_decay", 0.0))
+    warmup_epochs = float(train_cfg.get("warmup_epochs", 0))
+    decay_type = train_cfg.get("decay_type", "cosine")
+    lr_min = float(train_cfg.get("lr_min", 1e-6))
+
+    steps_per_epoch = max(1, meta["n_train"] // batch_size)
+    print(f"[train] schedule: OneCycleLR lr={base_lr:.2e}->{lr_min:.2e} "
+          f"warmup={warmup_epochs}ep decay={decay_type} steps/epoch={steps_per_epoch}")
+
+    lr_schedule = OneCycleLR(
+        lr=base_lr, epochs=epochs, steps_per_epoch=steps_per_epoch,
+        decay_epochs=epochs, warmup_epochs=warmup_epochs,
+        lr_start=0.0, lr_min=lr_min,
+        warmup_type=train_cfg.get("warmup_type", "linear"),
+        decay_type=decay_type,
     )
-    print(f"[train] model={cfg['model']['name']} params={model.count_params():,}")
+    wd_schedule = OneCycleLR(
+        lr=base_lr * weight_decay, epochs=epochs, steps_per_epoch=steps_per_epoch,
+        decay_epochs=epochs, warmup_epochs=warmup_epochs,
+        lr_start=0.0, lr_min=lr_min * weight_decay,
+        warmup_type=train_cfg.get("warmup_type", "linear"),
+        decay_type=decay_type,
+    )
 
-    resume = cfg["train"].get("resume_from")
+    optimizer = tfa.optimizers.RectifiedAdam(
+        learning_rate=lr_schedule, weight_decay=wd_schedule, sma_threshold=4,
+    )
+    optimizer = tfa.optimizers.Lookahead(optimizer, sync_period=5)
+
+    # Build model + AWP wrap.
+    awp_enabled = bool(train_cfg.get("awp", False))
+    awp_lambda = float(train_cfg.get("awp_lambda", 0.2))
+    awp_start_epoch = int(train_cfg.get("awp_start_epoch", 15))
+    dropout_start_epoch = int(train_cfg.get("dropout_start_epoch", 15))
+    dropout_step = dropout_start_epoch * steps_per_epoch
+    awp_step = awp_start_epoch * steps_per_epoch
+
+    model_cfg = cfg["model"]
+    base_model = get_model(
+        num_classes=num_classes, max_len=max_len, channels=CHANNELS,
+        dim=int(model_cfg["dim"]), dropout_step=dropout_step,
+        kernel_size=int(model_cfg.get("kernel_size", 17)),
+        conv_drop=float(model_cfg.get("conv_drop", 0.2)),
+        transformer_expand=int(model_cfg.get("transformer_expand", 2)),
+        late_drop=float(model_cfg.get("late_drop", 0.8)),
+    )
+    print(f"[train] model: dim={model_cfg['dim']} params={base_model.count_params():,}")
+
+    if awp_enabled:
+        model = AWP(base_model.input, base_model.output,
+                    delta=awp_lambda, eps=0.0, start_step=awp_step)
+        print(f"[train] AWP enabled: delta={awp_lambda} start_step={awp_step} "
+              f"(epoch {awp_start_epoch})")
+    else:
+        model = base_model
+
+    resume = train_cfg.get("resume_from")
     if resume:
-        resume_path = Path(resume)
-        if resume_path.exists():
+        rp = Path(resume)
+        if rp.exists():
             try:
-                model.load_weights(str(resume_path), skip_mismatch=True, by_name=True)
-                print(f"[train] resumed weights from {resume_path}")
+                model.load_weights(str(rp), skip_mismatch=True, by_name=True)
+                print(f"[train] resumed weights from {rp}")
             except Exception as e:
                 print(f"[train] WARN resume failed ({e}); training from scratch")
 
-    n_train = datasets["meta"]["n_train"]
-    steps_per_epoch = max(1, (n_train + cfg["train"]["batch_size"] - 1) // cfg["train"]["batch_size"])
-    optimizer = _build_optimizer(cfg, steps_per_epoch)
-
-    # CutMix yields soft (one-hot blended) labels via build_batch_cutmix.
-    # When CutMix is on, both train and val pipelines emit one-hot labels so
-    # the same compiled loss + metric work for both. When off, keep the
-    # cheaper sparse path.
-    cutmix_enabled = bool(datasets["meta"].get("cutmix_enabled"))
-    if cutmix_enabled:
-        loss_fn = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
-        acc_metric = tf.keras.metrics.CategoricalAccuracy(name="acc")
-        print(f"[train] CutMix enabled: using CategoricalCrossentropy + "
-              f"CategoricalAccuracy (one-hot labels)")
-    else:
-        loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-        acc_metric = tf.keras.metrics.SparseCategoricalAccuracy(name="acc")
-
+    label_smoothing = float(train_cfg.get("label_smoothing", 0.1))
     model.compile(
         optimizer=optimizer,
-        loss=loss_fn,
-        metrics=[acc_metric],
+        loss=tf.keras.losses.CategoricalCrossentropy(
+            from_logits=True, label_smoothing=label_smoothing,
+        ),
+        metrics=[tf.keras.metrics.CategoricalAccuracy(name="acc")],
+        steps_per_execution=steps_per_epoch,
         jit_compile=bool(_gpus),
     )
 
+    # Callbacks.
     callbacks = []
     monitor_ds = datasets.get("val_signer") or datasets.get("val")
     if monitor_ds is not None:
@@ -234,90 +222,100 @@ def main():
             mode="max",
             save_best_only=True,
         ))
-        callbacks.append(tf.keras.callbacks.EarlyStopping(
-            monitor="val_acc",
-            mode="max",
-            patience=int(cfg["train"].get("early_stop_patience", 10)),
-            restore_best_weights=True,
-        ))
+        patience = int(train_cfg.get("early_stop_patience", 0) or 0)
+        if patience > 0:
+            callbacks.append(tf.keras.callbacks.EarlyStopping(
+                monitor="val_acc",
+                mode="max",
+                patience=patience,
+                restore_best_weights=True,
+            ))
+    callbacks.append(tf.keras.callbacks.CSVLogger(
+        str(out_dir / "logs.csv"), append=False,
+    ))
 
     history = model.fit(
         datasets["train"],
         validation_data=monitor_ds,
-        epochs=cfg["train"]["epochs"],
+        epochs=epochs,
+        steps_per_epoch=steps_per_epoch,
         callbacks=callbacks,
         verbose=2,
     )
 
-    model.save(out_dir / "saved_model", save_format="tf")
+    # Save artifacts. Use the underlying base_model for save_weights so we
+    # don't pickle the AWP wrapper class (which depends on this repo).
+    base_model.save_weights(str(out_dir / "last.weights.h5"))
+    base_model.save(out_dir / "saved_model", save_format="tf")
     print(f"[train] saved -> {out_dir}")
 
-    # Vocab sidecar: pin the EXACT label index <-> gloss mapping the model
-    # was trained against. realtime_demo.py refuses to load a checkpoint
-    # without this file -- prevents the failure mode where the demo silently
-    # picks a vocab that doesn't match the model's softmax dimension.
     sidecar = out_dir / "vocab.json"
     sidecar.write_text(json.dumps({
-        "vocab": list(datasets["meta"]["vocab"]),
+        "vocab": list(meta["vocab"]),
         "n_classes": num_classes,
         "source_config": args.config,
         "experiment_name": cfg["experiment"]["name"],
         "run_id": run_id,
         "model": {
-            "name": cfg["model"]["name"],
-            "dim": cfg["model"]["dim"],
-            "n_blocks": cfg["model"].get("n_blocks", 4),
-            "n_heads": cfg["model"].get("n_heads", 4),
-            "conv_kernel": cfg["model"].get("conv_kernel", 17),
-            "ffn_expansion": cfg["model"].get("ffn_expansion", 4),
+            "name": "islr_hoyso48",
+            "dim": int(model_cfg["dim"]),
+            "kernel_size": int(model_cfg.get("kernel_size", 17)),
+            "transformer_expand": int(model_cfg.get("transformer_expand", 2)),
+            "conv_drop": float(model_cfg.get("conv_drop", 0.2)),
+            "late_drop": float(model_cfg.get("late_drop", 0.8)),
         },
         "data": {
-            "max_len": cfg["data"]["max_len"],
-            "n_landmarks": cfg["data"]["n_landmarks"],
-            "n_channels": cfg["data"].get("n_channels", 6),
-            "use_motion_deltas": bool(cfg["data"].get("use_motion_deltas",
-                                                       cfg["data"].get("n_channels", 6) >= 6)),
-            "use_acceleration": bool(cfg["data"].get("use_acceleration",
-                                                      cfg["data"].get("n_channels", 6) == 9)),
+            "max_len": max_len,
+            "channels": CHANNELS,
         },
     }, indent=2))
     print(f"[train] wrote vocab sidecar -> {sidecar} ({num_classes} classes)")
 
-    # Placeholder temperature.json so realtime_demo.py's calibration.apply: true
-    # path doesn't have to special-case missing files. T=1.0 is the identity
-    # passthrough; src/calibrate.py overwrites this with the fitted T after
-    # training. Skipped if a calibrated file already exists from a prior run.
+    # Placeholder temperature.json (T=1.0 identity; calibrate fits real T post-hoc).
     temp_sidecar = out_dir / "temperature.json"
     if not temp_sidecar.exists():
         temp_sidecar.write_text(json.dumps({
             "T": 1.0,
-            "_note": ("Placeholder written by src/train.py at training time. "
-                       "Overwrite with `python -m src.calibrate --checkpoint <dir>` "
-                       "after training to fit a real temperature on val_signer."),
+            "_note": "Placeholder. Fit real T with `python -m src.calibrate --checkpoint <dir>`.",
             "_run_id": run_id,
         }, indent=2) + "\n")
-        print(f"[train] wrote placeholder temperature sidecar -> {temp_sidecar}")
 
     train_acc = float(history.history.get("acc", [0.0])[-1])
-    val_acc = float(history.history.get("val_acc", [0.0])[-1]) if monitor_ds is datasets.get("val") else ""
+    val_acc = ""
     val_signer_acc = ""
-    if datasets.get("val_signer") is not None:
-        results = model.evaluate(datasets["val_signer"], verbose=0, return_dict=True)
-        val_signer_acc = float(results.get("acc", 0.0))
+    if datasets.get("val") is not None and "val_acc" in history.history:
+        # If the val/val_signer monitor was val_signer, the per-epoch val_acc is
+        # for val_signer; we additionally evaluate val explicitly if both exist.
+        if datasets.get("val_signer") is not None and monitor_ds is datasets.get("val_signer"):
+            val_signer_acc = float(history.history.get("val_acc", [0.0])[-1])
+            try:
+                results = base_model.evaluate(datasets["val"], verbose=0, return_dict=True)
+                val_acc = float(results.get("acc", 0.0))
+            except Exception as e:
+                print(f"[train] WARN explicit val eval failed: {e}")
+        else:
+            val_acc = float(history.history.get("val_acc", [0.0])[-1])
+    elif datasets.get("val_signer") is not None and "val_acc" in history.history:
+        val_signer_acc = float(history.history.get("val_acc", [0.0])[-1])
 
-    latency_ms = _benchmark_latency(model, cfg) if cfg.get("eval", {}).get("benchmark_latency", True) else ""
+    latency_ms = ""
+    if cfg.get("eval", {}).get("benchmark_latency", True):
+        try:
+            latency_ms = round(_benchmark_latency(base_model, max_len), 2)
+        except Exception as e:
+            print(f"[train] WARN latency benchmark failed: {e}")
 
     _append_experiment_row({
         "run_id": run_id,
         "timestamp": int(time.time()),
         "config": args.config,
-        "model": cfg["model"]["name"],
+        "model": "islr_hoyso48",
         "vocab_size": num_classes,
         "train_acc": round(train_acc, 4),
         "val_acc": round(val_acc, 4) if isinstance(val_acc, float) else val_acc,
         "val_signer_acc": round(val_signer_acc, 4) if isinstance(val_signer_acc, float) else val_signer_acc,
-        "latency_ms": round(latency_ms, 2) if isinstance(latency_ms, float) else latency_ms,
-        "n_params": model.count_params(),
+        "latency_ms": latency_ms,
+        "n_params": base_model.count_params(),
         "notes": cfg["experiment"].get("notes", ""),
     })
     print("[train] appended row to experiments.csv")

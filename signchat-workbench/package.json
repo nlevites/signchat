@@ -11,7 +11,9 @@
     "typecheck": "tsc --noEmit",
     "smoke:classifier": "node scripts/test-classifier-fixture.mjs",
     "smoke:assembly": "tsx scripts/test-landmark-assembly.ts",
-    "smoke:credentials": "node scripts/test-credentials.mjs"
+    "smoke:credentials": "node scripts/test-credentials.mjs",
+    "smoke:livekit": "node scripts/test-livekit.mjs",
+    "smoke:openrouter": "node scripts/test-openrouter.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^0.10.17",

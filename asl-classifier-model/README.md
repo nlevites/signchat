@@ -1,15 +1,8 @@
 # SignChatModel
 
-Real-time American Sign Language → text MVP. MediaPipe Holistic landmarks → small Conformer classifier → live webcam demo on M-series Mac (or any Linux GPU).
+Real-time American Sign Language → text MVP. MediaPipe Holistic landmarks → ~1.7M-param Conv1D-Transformer hybrid → live webcam demo on M-series Mac (or any Linux GPU).
 
-The primary training target is the **PopSign 250-sign vocabulary** (the Google Kaggle ISLR / `asl-signs` competition dataset). Architecture and recipe follow the Kaggle ASL ISLR 1st/2nd-place winners:
-
-1. small Conformer (~5–8 M params; `dim=192`, 6 blocks)
-2. short sequences (`max_len=160`)
-3. position + velocity + acceleration channels (`n_channels=9`)
-4. CutMix at the batch level
-
-A cross-dataset broad/tight head-swap recipe is preserved as a secondary path for cases where PopSign 250 doesn't cover the target lexicon.
+The training target is the **PopSign 250-sign vocabulary** (the Google Kaggle ISLR / `asl-signs` competition dataset). Architecture and recipe are a faithful port of [hoyso48's 1st-place solution](https://www.kaggle.com/competitions/asl-signs/discussion/406684) ([reference notebook](https://github.com/hoyso48/Google---Isolated-Sign-Language-Recognition-1st-place-solution/blob/main/ISLR_1st_place_Hoyeol_Sohn.ipynb)) — a Conv1D-Transformer hybrid trained with bf16 + XLA, OneCycleLR cosine, Lookahead-RectifiedAdam, and AWP regularization. Hardware adaptation: single H200 in place of 8× TPU v3 at the same effective batch size and peak learning rate.
 
 ---
 
@@ -22,13 +15,23 @@ make install
 cp .env.example .env
 # Edit .env: RUNPOD_API_KEY, KAGGLE_USERNAME, KAGGLE_KEY.
 
-# 2. Train PopSign 250 on a RunPod H200 (~$8, ~2 hr)
-caffeinate -dimsuw $$ \
-    make pod-train-phase1-kaggle VOLUME_ID=412s5n8qkh
+# 2. Make sure the asl-signs Kaggle competition rules are accepted on your
+# Kaggle account at https://www.kaggle.com/competitions/asl-signs/rules
+# (the download endpoint silently 403s for unaccepted competitions).
 
-# 3. Calibrate + demo (local, no GPU)
-make calibrate CKPT=pretrained/phase1_kaggle/
-make demo      CKPT=pretrained/phase1_kaggle/
+# 3. Extract PopSign onto a RunPod network volume (~$0.30 + ~$3-4 if forced
+# onto an H200 due to global CPU pod capacity exhaustion; ~30-60 min). The
+# script provisions the pod, downloads + extracts, terminates pod.
+caffeinate -dimsuw $$ \
+    python -u scripts/runpod_kaggle_islr.py --skip-rsync
+# Capture the new volume id printed at the end.
+
+# 4. Train PopSign 250 on a RunPod H200 (~$16, ~4 hr).
+caffeinate -dimsuw $$ \
+    make pod-train-phase1-kaggle VOLUME_ID=<volume_id_from_step_3>
+
+# 5. Eval on the held-out signers (local, no GPU).
+make eval CKPT=pretrained/phase1_kaggle/
 ```
 
 `make help` lists every target with one-line descriptions.
@@ -40,7 +43,7 @@ make demo      CKPT=pretrained/phase1_kaggle/
 ```
 configs/                YAML recipes (extend base.yaml via `extends:`)
 data/splits/            signer-disjoint train/val/held JSON
-data/vocab/             locked vocabularies (PopSign 250, Coffee Chat 25, etc.)
+data/vocab/             locked vocabularies (PopSign 250)
 src/                    model + preprocessing + training + demo
 src/data/               dataset loaders + tf.data pipeline (.npy backed)
 scripts/                RunPod orchestration + tooling
@@ -54,89 +57,115 @@ data/cache/             MediaPipe landmark caches (live on the RunPod volume)
 pretrained/             trained checkpoints (populated by pod-train targets)
 .env, kaggle.json       credentials (BYO)
 *.log, _logs/           pod orchestration logs
+.venv/                  local Python venv
 ```
 
 ---
 
 ## Architecture
 
-A small Conformer encoder over 130 MediaPipe Holistic landmarks per frame, 160 frames per clip, with 9 input channels (xyz + first-difference + second-difference). Trained as either a 250-class PopSign softmax (primary) or as a transfer-base broad model that head-swaps to a tight demo lexicon (secondary).
+A hoyso48-style alternating Conv1D-Transformer over 118 selected MediaPipe Holistic landmarks per frame (40 lip + 21 left hand + 21 right hand + 4 nose + 16 right eye + 16 left eye; pose and most of the face dropped on purpose). 384 frames per clip, 6 channels (only x, y plus 1-step and 2-step temporal differences — z is dropped because hoyso48 found it dilutes the attention signal). Trained as a 250-class PopSign softmax.
 
 ```
-landmarks (T, 543, 3)
-    ↓ src/landmarks.py:  pick 76 face + 12 pose + 42 hands → (T, 130, 3)
-    ↓ src/preprocessing.py:
-        per-clip mean/std normalization, NaN→0
-        handedness flip → canonical right-handed
-        time resample to max_len=160
-        concat first-diff (vel) + second-diff (accel) → (T, 130, 9)
-    ↓ src/model.py: Conformer encoder
-        dim=192, 6 blocks, 6 heads, conv_kernel=31, ffn_expansion=4
-        ~5–8 M params
-    ↓ MaskedGlobalAveragePool1D
-    ↓ Dense(N_classes) → softmax
+landmarks (T, 543, 3)                      # raw kaggle parquet
+    ↓ src/landmarks.py:  pick the 118 hoyso48 landmarks
+    ↓ src/preprocessing.py (Preprocess layer):
+        per-clip nose-centered + std normalization
+        drop z; keep (x, y) only
+        concat [(x, y), 1-step diff, 2-step diff] → (T, 708)
+        NaN → 0 after normalization
+    ↓ src/augment.py (training only):
+        resample(0.5, 1.5) p=0.8                  # time scale
+        flip_lr p=0.5                             # mirror x with full L/R block swap
+        temporal_crop to max_len=384
+        spatial_random_affine p=0.75              # rot ±30°, shear ±0.15, shift ±0.1
+        temporal_mask p=0.5                       # 20-40% of frames → NaN
+        spatial_mask  p=0.5                       # bbox region → NaN
+    ↓ src/model.py: hoyso48 1st-place architecture
+        Masking(mask_value=-100) + Dense(192) stem + BN
+        Conv1DBlock × 3 (ksize=17, expand=2, ECA, dropout=0.2)
+        TransformerBlock × 1 (dim=192, expand=2, attn_dropout=0.2)
+        Conv1DBlock × 3
+        TransformerBlock × 1
+        Dense(384) "top_conv"
+        GlobalAveragePooling1D
+        LateDropout(0.8, start_step=15ep × steps_per_epoch)
+    ↓ Dense(250) → fp32 logits
 ```
 
-Why these sizes: the asl-signs Kaggle 1st/2nd-place winners had a 40 MB TFLite cap that forced ~5–10 M params; that turned out to be the right capacity for landmark-only ISLR — scaling beyond it on this data hurts rather than helps.
+Param count: ~1.7M. Forward pass on H200 is dominated by the optimizer + AWP overhead (the model itself is tiny); on M4 metal it's ~5-10 ms per window.
 
-Inference path: tensorflow-metal on M-series Mac, ~5–10 ms per window (160 frames). MediaPipe Holistic dominates wall time at ~25–35 ms/frame; the demo runs the model every 8 frames to stay realtime.
+Why such a small model: the Kaggle ISLR competition had a 40 MB TFLite cap that forced ~1-2M params; that turned out to be the right capacity for landmark-only ISLR — scaling beyond it on this data hurts rather than helps.
+
+Inference path: tensorflow-metal on M-series Mac, ~5-10 ms per window. MediaPipe Holistic dominates wall time at ~25-35 ms/frame; the demo is intended to run the model every 8 frames to stay realtime.
 
 ---
 
-## Training recipes
+## Training recipe
 
-All configs inherit from `[configs/base.yaml](configs/base.yaml)`.
+All configs inherit from [`configs/base.yaml`](configs/base.yaml) and the only training entry point is [`configs/pretrain_phase1_kaggle.yaml`](configs/pretrain_phase1_kaggle.yaml).
 
-### Primary: PopSign 250 single-source — `[configs/pretrain_phase1_kaggle.yaml](configs/pretrain_phase1_kaggle.yaml)`
-
-```
+```yaml
 data:
-  cache_dir:    [data/cache/kaggle_islr]   # 94k npy, 250 PopSign signs
-  vocab:        auto                        # resolves to 250-class softmax
+  cache_dir:    [data/cache/kaggle_islr]   # ~94k npy, 250 PopSign signs
+  vocab:        auto                       # resolves to 250-class softmax
   splits_path:  data/splits/kaggle_islr.json   # 13/4/4 signer split
+  max_len:      384
+
+model:
+  dim:                192
+  kernel_size:        17
+  transformer_expand: 2
+  conv_drop:          0.2
+  late_drop:          0.8
+
 train:
-  batch_size: 256, epochs: 30, lr: 5e-4, warmup_epochs: 2,
-  schedule: cosine, early_stop_patience: 8
+  batch_size:          512        # = 64 × 8 replicas in the original; H200 fits at b=512
+  epochs:              300
+  lr:                  4.0e-3     # = 5e-4 × 8 replicas
+  lr_min:              1.0e-6
+  weight_decay:        0.1        # follows the OneCycle schedule
+  warmup_epochs:       0
+  decay_type:          cosine
+  label_smoothing:     0.1
+  awp:                 true
+  awp_lambda:          0.2
+  awp_start_epoch:     15
+  dropout_start_epoch: 15
 ```
 
-Output: `pretrained/phase1_kaggle/{best.weights.h5, vocab.json, temperature.json, saved_model/}`.
+Optimizer: `tfa.optimizers.Lookahead(tfa.optimizers.RectifiedAdam(lr=schedule, weight_decay=decay_schedule, sma_threshold=4), sync_period=5)`. Both lr AND weight_decay follow the OneCycleLR shape. With `warmup_epochs=0` this is effectively a pure cosine decay from 4e-3 → 1e-6 across 300 epochs.
 
-### Smoke gate — `[configs/pretrain_phase1_kaggle_smoke.yaml](configs/pretrain_phase1_kaggle_smoke.yaml)`
+AWP (Adversarial Weight Perturbation, vendored from [hoyso48/tf-utils](https://github.com/hoyso48/tf-utils) at [`src/awp.py`](src/awp.py)): from epoch 15, every train step does (1) forward+backward to get gradients, (2) perturb trainable weights along the L2-normalized gradient with magnitude `delta=0.2`, (3) forward+backward on the perturbed weights, (4) restore weights, (5) apply the adversarial gradient. ~2× per-step cost; materially helps generalization.
 
-Same data + same architecture, only 2 epochs. Cheap drift gate (~$3 H200, ~45 min) before committing to the full run. Gate threshold: `**val_acc ≥ 0.10**` at epoch 2 to proceed.
+LateDropout (vendored): 80% dropout before the classifier, but identity until step `dropout_start_epoch × steps_per_epoch`.
 
-### Secondary: cross-dataset broad + tight head-swap
+Output: `pretrained/phase1_kaggle/{best.weights.h5, last.weights.h5, vocab.json, temperature.json, saved_model/, logs.csv}`.
 
-Use when the PopSign 250 vocabulary doesn't cover the target demo lexicon (e.g. the 25-sign Coffee Chat script).
+### Smoke gate
 
-- `[pretrain_phase1_broad.yaml](configs/pretrain_phase1_broad.yaml)`: 4-cache union (`asl_citizen` + `wlasl` + `wlasl_full` + `kaggle_islr`), `vocab: auto` resolves to ~1100+ classes, 60 epochs, ~$16, ~4 hr.
-- `[pretrain_phase1_tight.yaml](configs/pretrain_phase1_tight.yaml)`: 25-class tight softmax, `resume_from: pretrained/phase1_broad/best.weights.h5`, head-swap via `load_weights(by_name=True, skip_mismatch=True)`. ~$6, ~1.5 hr.
-
-Cross-dataset loaders (`[src/data/asl_citizen_loader.py](src/data/asl_citizen_loader.py)`, `[src/data/wlasl_kaggle_loader.py](src/data/wlasl_kaggle_loader.py)`, `[src/data/wlasl_raw_loader.py](src/data/wlasl_raw_loader.py)`) and the gloss alias resolver (`[src/data/gloss_aliases.py](src/data/gloss_aliases.py)`) stay in the repo as the secondary path.
-
----
-
-## Inference contract layer
-
-The realtime demo doesn't just argmax the softmax — it goes through a state machine (`[src/contract.py](src/contract.py)`) that:
-
-- emits a `TickEvent` per inference window (top-K + max prob + entropy + motion energy)
-- gates low-confidence ticks (`max_prob < oov_gate`) so a fluent off-script sign reads as `?` instead of a confident wrong guess
-- requires `stability_k` consecutive agreeing windows before committing
-- short-circuits to "idle" when hand motion energy is below threshold
-- streams every tick as JSONL via `[src/llm_bridge.py](src/llm_bridge.py)` for a downstream LLM consumer (see `[scripts/llm_consumer.py](scripts/llm_consumer.py)`)
-
-Knobs live in `[configs/contract.yaml](configs/contract.yaml)` — tune per camera/signer/venue without retraining.
-
-`[src/calibrate.py](src/calibrate.py)` fits a scalar temperature `T` on `val_signer` and writes `temperature.json` next to the checkpoint. The demo divides logits by `T` before softmax, so `prob=0.7` actually means the model is right ~70% of the time. Argmax is preserved (top-1 acc unchanged); only confidence is honest-up'd for the LLM consumer.
-
-End-to-end:
+For a $1 sanity run before committing to the full ~$16 / ~4 hr training:
 
 ```bash
-python -m src.realtime_demo --checkpoint pretrained/phase1_kaggle/ \
-    --llm-bridge stdout | \
-    python scripts/llm_consumer.py --provider claude
+caffeinate -dimsuw $$ \
+    make pod-train-phase1-kaggle VOLUME_ID=<id> EPOCHS=5
 ```
+
+Gate threshold: `val_acc > 0.04` at epoch 5 (10× random for 250 classes). At b=512, ~94k/512 ≈ 184 steps/epoch × 5 epochs ≈ 920 steps. With label smoothing the random-init loss is ~5.7; we want it dropping clearly below ~5.0 by step ~500.
+
+If smoke fails — first thing to suspect is AWP. Set `awp: false` in `[configs/base.yaml](configs/base.yaml)` and re-smoke to isolate it from the rest of the port.
+
+---
+
+## End-to-end commands
+
+| Step | Command | Cost / time |
+|---|---|---|
+| Extract PopSign onto a fresh volume (one-time) | `python -u scripts/runpod_kaggle_islr.py --skip-rsync` | ~$0.30-4 / ~30-60 min ([note on capacity](#runpod-tips)) |
+| Smoke train (5 epochs) | `caffeinate -dimsuw $$ make pod-train-phase1-kaggle VOLUME_ID=<id> EPOCHS=5` | ~$1 / ~10-15 min |
+| Full train (300 epochs) | `caffeinate -dimsuw $$ make pod-train-phase1-kaggle VOLUME_ID=<id>` | ~$16 / ~4 hr |
+| Eval on held-out signers | `make eval CKPT=pretrained/phase1_kaggle/` | ~1 min local |
+| Unit tests | `make test` | ~1 sec |
 
 ---
 
@@ -146,11 +175,27 @@ python -m src.realtime_demo --checkpoint pretrained/phase1_kaggle/ \
 
 A sleeping Mac silently strands SSH/rsync while the GPU pod keeps billing. Prepend `caffeinate -dimsuw $$` to any long-running pod target.
 
-### Pass `VOLUME_ID=<id>` to every phase1 pod-train target
+### Pass `VOLUME_ID=<id>` to every pod-train invocation
 
-When set, the H200 train pod mounts the network volume at `/workspace` and the per-dataset caches (`asl_citizen`, `wlasl`, `wlasl_full`, `kaggle_islr`) are **symlinked** from `/workspace/cache/<dataset>/` into the repo's `data/cache/` instead of rsync'd from local. Without it the orchestrator falls back to rsyncing 95k+ small npy files over inter-DC SSH, which is much slower and more fragile.
+When set, the H200 train pod mounts the network volume at `/workspace`, and `data/cache/kaggle_islr/` is **symlinked** from `/workspace/cache/kaggle_islr/` into the repo's `data/cache/` instead of rsync'd from local. Without it the orchestrator falls back to rsyncing 92k+ small npy files over inter-DC SSH, which is much slower and more fragile.
 
-The active EU-RO-1 volume is `**412s5n8qkh`** (300 GB). It holds the full `asl_citizen`, `wlasl`, `wlasl_full`, and `kaggle_islr` (PopSign) `.npy` caches plus their raw inputs.
+### Capacity falls back gracefully
+
+[`scripts/runpod_kaggle_islr.py`](scripts/runpod_kaggle_islr.py) now iterates through CPU flavors (`cpu5c` → `cpu3c` → `cpu5g`) × cloud tiers (`SECURE` → `COMMUNITY`) before failing. If global CPU pod capacity is exhausted (this happens), pass `--gpu "NVIDIA H200"` to fall back to a GPU pod for the extract — wasteful at ~$4/hr but unblocks the pipeline. Add `--cpu-flavor` / `--cloud-type` to pin a specific path.
+
+[`scripts/runpod_train.py`](scripts/runpod_train.py) is pinned to H200 only (the recipe's bf16 + XLA + Hopper-tensor-core math depends on it). The pod is auto-pinned to the volume's data center via the SDK; just provide `VOLUME_ID`.
+
+### Volume size
+
+Default is 100 GB which is **tight** — the asl-signs raw zip (~37 GB) + extracted parquets (~41 GB) + extracted .npy cache (~31 GB) ≈ 109 GB. Resize to 150 GB before extract:
+
+```python
+# one-off
+from scripts.runpod_extract_fanout import RunpodREST
+import os
+rest = RunpodREST(os.environ['RUNPOD_API_KEY'])
+rest._req('PATCH', f'/networkvolumes/{VOLUME_ID}', json={'size': 150})
+```
 
 ### RunPod S3 env-var names are intentionally swapped
 
@@ -161,33 +206,9 @@ RUNPOD_S3_KEY          = <access key>   (looks like user_3CZ...)
 RUNPOD_S3_ACCESS_KEY   = <secret>       (looks like rps_4FY...)
 ```
 
-The names are swapped relative to what they mean — the runtime reads them this way. Endpoint: `https://s3api-eu-ro-1.runpod.io`, region `eu-ro-1`, bucket = volume id. Use `signature_version='s3v4'` and `addressing_style='path'`. Lets you read/inspect the volume from boto3 without spinning up a diagnostic pod.
+The names are swapped relative to what they mean — the runtime reads them this way. Endpoint: `https://s3api-<dc>.runpod.io`, region matches the dc, bucket = volume id. Use `signature_version='s3v4'` and `addressing_style='path'`. Lets you read/inspect the volume from boto3 without spinning up a diagnostic pod.
 
----
-
-## End-to-end commands
-
-
-| Step                                       | Command                                                                         | Cost / time         |
-| ------------------------------------------ | ------------------------------------------------------------------------------- | ------------------- |
-| Extract PopSign onto the volume (one-time) | `make pod-kaggle-islr VOLUME_ID=412s5n8qkh`                                     | ~$0.30 / ~30–60 min |
-| Schema sanity check (no spend)             | `make kaggle-islr-validate`                                                     | <30 sec local       |
-| Smoke gate (drift check)                   | `caffeinate -dimsuw $$ make pod-train-phase1-kaggle-smoke VOLUME_ID=412s5n8qkh` | ~$3 / ~45 min       |
-| Full PopSign train                         | `caffeinate -dimsuw $$ make pod-train-phase1-kaggle VOLUME_ID=412s5n8qkh`       | ~$8 / ~2 hr         |
-| Calibrate temperature                      | `make calibrate CKPT=pretrained/phase1_kaggle/`                                 | ~30 sec local       |
-| Eval on held-out signers                   | `make eval CKPT=pretrained/phase1_kaggle/`                                      | ~1 min local        |
-| Live demo                                  | `make demo CKPT=pretrained/phase1_kaggle/`                                      | webcam, no pod      |
-| Unit tests                                 | `make test`                                                                     | ~1 sec              |
-
-
-Cross-dataset secondary path (only if PopSign 250 misses your demo lexicon):
-
-
-| Step            | Command                                                                  | Cost / time       |
-| --------------- | ------------------------------------------------------------------------ | ----------------- |
-| Broad pretrain  | `caffeinate -dimsuw $$ make pod-train-phase1-broad VOLUME_ID=412s5n8qkh` | ~$16–23 / ~4–6 hr |
-| Tight head-swap | `caffeinate -dimsuw $$ make pod-train-phase1-tight VOLUME_ID=412s5n8qkh` | ~$6 / ~1.5 hr     |
-
+Note: the RunPod S3 leaf-listing for MooseFS-backed volumes can return `0 keys` for prefixes that DO contain files (a known quirk). For verifying a populated cache, prefer SSH'ing into a pod with the volume mounted and `find /workspace/cache/kaggle_islr -name '*.npy' | wc -l`.
 
 ---
 
@@ -202,30 +223,49 @@ tensorflow-metal==1.1.0
 
 The pod-side install always uses `tensorflow[and-cuda]==2.15.1` per the `sys_platform == "linux"` marker.
 
+`tensorflow-addons==0.23.0` (provides `tfa.optimizers.RectifiedAdam` + `tfa.optimizers.Lookahead`) is in maintenance mode and the last release that supports TF 2.15 — pinned for that reason.
+
 ---
 
 ## Validation
 
 ```bash
 make test                              # 19 unit tests, ~1 sec, CPU only
-make kaggle-islr-validate              # 5-clip parquet schema check, <30 sec
-make pretrain-phase1-kaggle-smoke      # 2-epoch local smoke (needs cache)
 ```
 
 `tests/` contains:
 
-- `[test_contract.py](tests/test_contract.py)` — 15 unit tests for the inference state machine (no TF dependency).
-- `[test_kaggle_islr_loader.py](tests/test_kaggle_islr_loader.py)` — 4 regression tests guarding (a) `parquet_to_tensor` produces the canonical (T, 543, 3) layout in [Pose, Face, LHand, RHand] order with NaNs preserved, and (b) the Kaggle-sign → disk-gloss map pairs by prediction index, not by JSON insertion order.
+- [`test_contract.py`](tests/test_contract.py) — 15 unit tests for the inference state machine (no TF dependency).
+- [`test_kaggle_islr_loader.py`](tests/test_kaggle_islr_loader.py) — 4 regression tests guarding (a) `parquet_to_tensor` produces the canonical (T, 543, 3) layout in [Pose, Face, LHand, RHand] order with NaNs preserved, and (b) the Kaggle-sign → disk-gloss map pairs by prediction index, not by JSON insertion order.
+
+Locally I also exercise the new model end-to-end on synthetic data (model build, AWP train_step, OneCycleLR schedule, Preprocess, augment_fn) — those checks live as one-liners in the PR description rather than pinned tests because they require TF + tensorflow-addons which we don't want in the test suite's CPU-only critical path.
 
 ---
 
-## Migration notes (when moving into a new sub-repo)
+## Known follow-ups (deliberately out of scope here)
 
-This repo is intentionally lean for the migration:
+- [`src/realtime_demo.py`](src/realtime_demo.py), [`src/calibrate.py`](src/calibrate.py): use the OLD model I/O contract (`[feats, mask]` two-tensor input). They are import-broken under the new single-tensor model and need rewiring before they work again. Tracked as a follow-up.
+- 4-seed ensemble — the published submission averages 4 seeds (42, 43, 44, 45) over the full dataset. Single seed first; revisit once this run is solid.
+- 2nd-place port (PyTorch + EfficientNet + DeBERTa). Major code addition; revisit only if the 1st-place reproduction is solid.
+- TFLite export. The original was for mobile; we just want the H200 checkpoint.
+- Cross-dataset broad/tight head-swap: the loaders ([`src/data/asl_citizen_loader.py`](src/data/asl_citizen_loader.py), [`src/data/wlasl_kaggle_loader.py`](src/data/wlasl_kaggle_loader.py), [`src/data/wlasl_raw_loader.py`](src/data/wlasl_raw_loader.py)) and gloss alias resolver ([`src/data/gloss_aliases.py`](src/data/gloss_aliases.py)) remain in the repo as importable modules but are no longer wired into any active config; can be pruned later if not needed.
+
+---
+
+## Migration notes
 
 - **Single-source-of-truth README** (this file). No `docs/` packet — everything operationally important is here.
 - **All credentials via `.env`** (gitignored). Copy `.env.example` and fill.
-- **Heavy artifacts live on RunPod volume `412s5n8qkh`**, not in the repo. The only PopSign artifact tracked locally is `data/vocab/kaggle_islr.json` plus the auto-written `data/splits/kaggle_islr.json` (~1 KB).
+- **Heavy artifacts live on the RunPod volume**, not in the repo. The only PopSign artifacts tracked locally are `data/vocab/kaggle_islr.json` (250-class vocab in prediction-index order) and `data/splits/kaggle_islr.json` (~1 KB; 13/4/4 signer split).
 - **No installable package**: the repo is run as `python -m src.<module>` from the repo root, driven by the [Makefile](Makefile). If you want a `pyproject.toml` install in the new repo, the `src/` layout is already set up for it.
-- **Python 3.10 / 3.11 only** (pinned in `[.python-version](.python-version)`) — TF 2.15 + MediaPipe 0.10.9 constraint.
+- **Python 3.10 / 3.11 only** — TF 2.15 + MediaPipe 0.10.9 constraint.
 
+---
+
+## References
+
+- 1st place writeup: <https://www.kaggle.com/competitions/asl-signs/discussion/406684>
+- 1st place code (Hoyeol Sohn): <https://github.com/hoyso48/Google---Isolated-Sign-Language-Recognition-1st-place-solution>
+- Vendored utilities (Apache-2.0): <https://github.com/hoyso48/tf-utils>
+- Competition page: <https://www.kaggle.com/competitions/asl-signs>
+- PopSign ASL v1.0 dataset (NeurIPS 2023): <https://popsign.org>

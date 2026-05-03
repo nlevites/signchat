@@ -1,245 +1,215 @@
-"""tf.data-friendly augmentations for landmark sequences.
+"""Augmentations for the hoyso48 1st-place port.
 
-All ops act on (max_len, 130, C) feature tensors (C = 3 for xyz only, or 6
-for xyz + xyz_velocity per Phase 1's motion-delta channels) that have
-already been preprocessed (mean=0, std=1, NaN replaced by 0).
+Faithful port of cell 8 of the reference notebook:
+    https://github.com/hoyso48/Google---Isolated-Sign-Language-Recognition-1st-place-solution/blob/main/ISLR_1st_place_Hoyeol_Sohn.ipynb
 
-Inspired by the 1st-place Kaggle ASL Fingerspelling cfg_2 augmentation list:
-SpatialAffine, TimeResample, TemporalMask, FingerDrop, sequence CutMix.
-Apache-2.0-compatible reimplementations.
+All augmentations operate on raw (T, 543, 3) MediaPipe Holistic landmarks in
+our LOCAL [Pose, Face, LHand, RHand] cache layout. They run inside the
+tf.data graph (no python in the inner loop) so input pipeline overhead stays
+flat across the 4-hour H200 train.
 
-Channel-count handling:
-- spatial_affine reshapes to (-1, 3) and applies a 3D rotation to each
-  3-vector. For 6-channel input, channels (0,1,2) are xyz and (3,4,5) are
-  xyz_velocity; both are 3D vectors and SHOULD rotate together (velocity
-  rotates the same as the position it's the derivative of), so the
-  reshape semantics are correct. The shift adds to ALL 3-vectors which
-  technically applies a translation to the velocity component too; that's
-  a tiny semantic wart but empirically harmless.
-- time_resample / temporal_mask / finger_drop / cutmix preserve the
-  channel dim explicitly via tf.shape(features)[-1].
+Suite (in `augment_fn`):
+
+    | Aug                  | p    | Range                                        |
+    |---                   |---   |---                                           |
+    | resample (time)      | 0.8  | (0.5, 1.5) -- WIDER than the typical 0.8-1.2 |
+    | flip_lr (mirror x)   | 0.5  | -- swap LHAND/RHAND, LLIP/RLIP, etc          |
+    | temporal_crop        | 1.0  | crop to max_len                              |
+    | spatial_random_affine| 0.75 | scale +-0.2, shear +-0.15, shift +-0.1, rot +-30 deg |
+    | temporal_mask (NaN)  | 0.5  | 20-40% of T                                  |
+    | spatial_mask (NaN)   | 0.5  | 20-40% bbox                                  |
+
+Note: NO CutMix, NO MixUp, NO finger_drop. Hoyso48's submission doesn't use them.
 """
 
 from __future__ import annotations
 
+import math
+
+import numpy as np
 import tensorflow as tf
 
-from . import landmarks as lm
+from .landmarks import (
+    LEYE,
+    LHAND,
+    LLIP,
+    LNOSE,
+    LPOSE,
+    N_TOTAL,
+    REYE,
+    RHAND,
+    RLIP,
+    RNOSE,
+    RPOSE,
+)
 
 
-def spatial_affine(features: tf.Tensor,
-                   max_rot_deg: float = 15.0,
-                   max_scale: float = 0.1,
-                   max_shift: float = 0.1) -> tf.Tensor:
-    """Apply random rotation around z, scale, and translation in the xy plane."""
-    theta = tf.random.uniform([], -max_rot_deg, max_rot_deg) * (3.14159265 / 180.0)
-    scale = 1.0 + tf.random.uniform([], -max_scale, max_scale)
-    shift_x = tf.random.uniform([], -max_shift, max_shift)
-    shift_y = tf.random.uniform([], -max_shift, max_shift)
+# --------------------------------------------------------------------------- time
 
-    cos_t = tf.cos(theta)
-    sin_t = tf.sin(theta)
-    rot = tf.stack([
-        tf.stack([cos_t, -sin_t, 0.0]),
-        tf.stack([sin_t,  cos_t, 0.0]),
-        tf.stack([  0.0,    0.0, 1.0]),
-    ])
-
-    flat = tf.reshape(features, [-1, 3])
-    flat = tf.matmul(flat, rot, transpose_b=True) * scale
-    flat = flat + tf.stack([shift_x, shift_y, 0.0])
-    return tf.reshape(flat, tf.shape(features))
+def interp1d_(x: tf.Tensor, target_len: tf.Tensor, method: str = "random") -> tf.Tensor:
+    """Time-axis interpolation. `random` mode samples from {bilinear, bicubic, nearest}."""
+    target_len = tf.maximum(1, target_len)
+    if method == "random":
+        if tf.random.uniform(()) < 0.33:
+            x = tf.image.resize(x, (target_len, tf.shape(x)[1]), "bilinear")
+        else:
+            if tf.random.uniform(()) < 0.5:
+                x = tf.image.resize(x, (target_len, tf.shape(x)[1]), "bicubic")
+            else:
+                x = tf.image.resize(x, (target_len, tf.shape(x)[1]), "nearest")
+    else:
+        x = tf.image.resize(x, (target_len, tf.shape(x)[1]), method)
+    return x
 
 
-def time_resample(features: tf.Tensor,
-                  mask: tf.Tensor,
-                  min_ratio: float = 0.8,
-                  max_ratio: float = 1.2) -> tuple[tf.Tensor, tf.Tensor]:
-    """Stretch / compress along time, then re-pad to original length."""
-    max_len = tf.shape(features)[0]
-    n_lm = tf.shape(features)[1]
-    n_ch = tf.shape(features)[2]
-    real_len = tf.reduce_sum(tf.cast(mask, tf.int32))
-    ratio = tf.random.uniform([], min_ratio, max_ratio)
-    new_len = tf.cast(tf.round(tf.cast(real_len, tf.float32) * ratio), tf.int32)
-    new_len = tf.clip_by_value(new_len, 8, max_len)
-
-    valid = features[:real_len]
-    valid = tf.transpose(valid, [1, 2, 0])                             # (n_lm, n_ch, real_len)
-    valid = tf.expand_dims(valid, axis=-1)                             # (n_lm, n_ch, real_len, 1)
-    resized = tf.image.resize(valid, [n_ch, new_len])                  # (n_lm, n_ch, new_len, 1)
-    resized = tf.squeeze(resized, axis=-1)
-    resized = tf.transpose(resized, [2, 0, 1])                         # (new_len, n_lm, n_ch)
-
-    pad = tf.zeros([max_len - new_len, n_lm, n_ch], dtype=features.dtype)
-    new_feats = tf.concat([resized, pad], axis=0)
-    # Restore the static shape so downstream layers see (max_len, n_lm, n_ch)
-    # rather than (None, None, None) — without this, dynamic-shape ops upstream
-    # collapse the static shape and the model rejects the input.
-    new_feats.set_shape(features.shape)
-    new_mask = tf.concat([
-        tf.ones([new_len], dtype=tf.bool),
-        tf.zeros([max_len - new_len], dtype=tf.bool),
-    ], axis=0)
-    new_mask.set_shape(mask.shape)
-    return new_feats, new_mask
+def resample(x: tf.Tensor, rate=(0.8, 1.2)) -> tf.Tensor:
+    """Random time-axis stretch by a factor in `rate`."""
+    rate = tf.random.uniform((), rate[0], rate[1])
+    length = tf.shape(x)[0]
+    new_size = tf.cast(rate * tf.cast(length, tf.float32), tf.int32)
+    return interp1d_(x, new_size)
 
 
-def temporal_mask(features: tf.Tensor,
-                  max_mask_frames: int = 32,
-                  n_masks: int = 2) -> tf.Tensor:
-    """SpecAugment-style temporal masking: zero out random time spans."""
-    max_len = tf.shape(features)[0]
-    out = features
-
-    def _one_mask(x):
-        width = tf.random.uniform([], 1, max_mask_frames + 1, dtype=tf.int32)
-        start = tf.random.uniform([], 0, tf.maximum(1, max_len - width), dtype=tf.int32)
-        idx = tf.range(max_len)
-        keep = tf.logical_or(idx < start, idx >= start + width)
-        keep = tf.reshape(tf.cast(keep, x.dtype), [max_len, 1, 1])
-        return x * keep
-
-    for _ in range(n_masks):
-        out = _one_mask(out)
-    return out
+def temporal_crop(x: tf.Tensor, length: int) -> tf.Tensor:
+    """Random temporal crop to `length`. If T <= length, returns x unchanged."""
+    l = tf.shape(x)[0]
+    offset = tf.random.uniform(
+        (), 0, tf.clip_by_value(l - length, 1, length), dtype=tf.int32,
+    )
+    return x[offset: offset + length]
 
 
-def finger_drop(features: tf.Tensor, prob: float = 0.1) -> tf.Tensor:
-    """Independently zero out left or right hand block with probability `prob`."""
-    drop_l = tf.random.uniform([]) < prob
-    drop_r = tf.random.uniform([]) < prob
-
-    mask = tf.ones([130, 1], dtype=features.dtype)
-    if_drop_l = tf.tensor_scatter_nd_update(
-        mask, tf.reshape(tf.range(0, 21), [-1, 1]), tf.zeros([21, 1], dtype=features.dtype))
-    mask = tf.cond(drop_l, lambda: if_drop_l, lambda: mask)
-
-    if_drop_r = tf.tensor_scatter_nd_update(
-        mask, tf.reshape(tf.range(21, 42), [-1, 1]), tf.zeros([21, 1], dtype=features.dtype))
-    mask = tf.cond(drop_r, lambda: if_drop_r, lambda: mask)
-
-    return features * mask[tf.newaxis, :, :]
+def temporal_mask(x: tf.Tensor, size=(0.2, 0.4),
+                  mask_value: float = float("nan")) -> tf.Tensor:
+    """Mask a contiguous chunk of frames (set to NaN by default)."""
+    l = tf.shape(x)[0]
+    mask_size = tf.random.uniform((), *size)
+    mask_size = tf.cast(tf.cast(l, tf.float32) * mask_size, tf.int32)
+    mask_offset = tf.random.uniform(
+        (), 0, tf.clip_by_value(l - mask_size, 1, l), dtype=tf.int32,
+    )
+    indices = tf.range(mask_offset, mask_offset + mask_size)[..., None]
+    updates = tf.fill([mask_size, N_TOTAL, 3], mask_value)
+    return tf.tensor_scatter_nd_update(x, indices, updates)
 
 
-def cutmix_sequence(features_a: tf.Tensor, mask_a: tf.Tensor, label_a: tf.Tensor,
-                    features_b: tf.Tensor, mask_b: tf.Tensor, label_b: tf.Tensor,
-                    alpha: float = 0.5) -> tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
-    """Splice the first `r * len_a` frames of A with the last `(1-r) * len_b` of B."""
-    max_len = tf.shape(features_a)[0]
-    r = tf.cast(tf.random.uniform([], alpha, 1.0 - alpha), tf.float32)
+# --------------------------------------------------------------------------- spatial
 
-    real_a = tf.reduce_sum(tf.cast(mask_a, tf.int32))
-    cut_a = tf.cast(tf.cast(real_a, tf.float32) * r, tf.int32)
+def spatial_random_affine(xyz: tf.Tensor,
+                          scale=(0.8, 1.2),
+                          shear=(-0.15, 0.15),
+                          shift=(-0.1, 0.1),
+                          degree=(-30, 30)) -> tf.Tensor:
+    """Random affine on the (x, y) plane: scale, shear, rotation, translation.
 
-    real_b = tf.reduce_sum(tf.cast(mask_b, tf.int32))
-    keep_b = tf.minimum(real_b, max_len - cut_a)
-
-    head = features_a[:cut_a]
-    tail = features_b[:keep_b]
-    n_lm = tf.shape(features_a)[1]
-    n_ch = tf.shape(features_a)[2]
-    pad = tf.zeros([max_len - cut_a - keep_b, n_lm, n_ch], dtype=features_a.dtype)
-    feats = tf.concat([head, tail, pad], axis=0)
-    feats.set_shape(features_a.shape)
-
-    new_real = cut_a + keep_b
-    new_mask = tf.concat([
-        tf.ones([new_real], dtype=tf.bool),
-        tf.zeros([max_len - new_real], dtype=tf.bool),
-    ], axis=0)
-
-    mix_label = r * tf.cast(label_a, tf.float32) + (1.0 - r) * tf.cast(label_b, tf.float32)
-    return feats, new_mask, mix_label
-
-
-def build_augment_fn(cfg: dict):
-    """Compose augmentations into a single (features, mask) -> (features, mask) callable.
-
-    Per-element augmentations only. CutMix runs at the BATCH level via
-    ``build_batch_cutmix``; it has its own pipeline stage in
-    ``src/data/tfrecords.py`` because it needs pairs.
+    z is preserved through scale/shift but excluded from shear/rotation since
+    those operate in the image plane only.
     """
-    sa = cfg.get("spatial_affine", {})
-    tr = cfg.get("time_resample", {})
-    tm = cfg.get("temporal_mask", {})
-    fd = cfg.get("finger_drop", {})
+    center = tf.constant([0.5, 0.5])
+    if scale is not None:
+        s = tf.random.uniform((), *scale)
+        xyz = s * xyz
 
-    def _fn(features: tf.Tensor, mask: tf.Tensor):
-        if tr.get("enabled"):
-            features, mask = time_resample(features, mask,
-                                           min_ratio=tr.get("min_ratio", 0.8),
-                                           max_ratio=tr.get("max_ratio", 1.2))
-        if sa.get("enabled"):
-            features = spatial_affine(features,
-                                      max_rot_deg=sa.get("max_rot_deg", 15.0),
-                                      max_scale=sa.get("max_scale", 0.1),
-                                      max_shift=sa.get("max_shift", 0.1))
-        if tm.get("enabled"):
-            features = temporal_mask(features,
-                                     max_mask_frames=tm.get("max_mask_frames", 32),
-                                     n_masks=tm.get("n_masks", 2))
-        if fd.get("enabled"):
-            features = finger_drop(features, prob=fd.get("prob", 0.1))
-        return features, mask
+    if shear is not None:
+        xy = xyz[..., :2]
+        z = xyz[..., 2:]
+        shear_x = shear_y = tf.random.uniform((), *shear)
+        if tf.random.uniform(()) < 0.5:
+            shear_x = 0.0
+        else:
+            shear_y = 0.0
+        shear_mat = tf.identity([
+            [1.0, shear_x],
+            [shear_y, 1.0],
+        ])
+        xy = xy @ shear_mat
+        center = center + [shear_y, shear_x]
+        xyz = tf.concat([xy, z], axis=-1)
 
-    return _fn
+    if degree is not None:
+        xy = xyz[..., :2]
+        z = xyz[..., 2:]
+        xy = xy - center
+        deg = tf.random.uniform((), *degree)
+        radian = deg / 180.0 * math.pi
+        c = tf.math.cos(radian)
+        s = tf.math.sin(radian)
+        rotate_mat = tf.identity([[c, s], [-s, c]])
+        xy = xy @ rotate_mat
+        xy = xy + center
+        xyz = tf.concat([xy, z], axis=-1)
+
+    if shift is not None:
+        d = tf.random.uniform((), *shift)
+        xyz = xyz + d
+
+    return xyz
 
 
-def build_batch_cutmix(alpha: float = 0.3, prob: float = 1.0):
-    """Batch-level CutMix wrapping ``cutmix_sequence`` over a shuffled pairing.
+def spatial_mask(x: tf.Tensor, size=(0.2, 0.4),
+                 mask_value: float = float("nan")) -> tf.Tensor:
+    """Mask any landmark whose (x, y) falls inside a random axis-aligned bbox."""
+    mask_offset_y = tf.random.uniform(())
+    mask_offset_x = tf.random.uniform(())
+    mask_size = tf.random.uniform((), *size)
+    mask_x = (mask_offset_x < x[..., 0]) & (x[..., 0] < mask_offset_x + mask_size)
+    mask_y = (mask_offset_y < x[..., 1]) & (x[..., 1] < mask_offset_y + mask_size)
+    mask = mask_x & mask_y
+    return tf.where(mask[..., None], mask_value, x)
 
-    Expects ALREADY one-hot (or soft) labels of shape (B, num_classes). Pairs
-    each example in the batch with another via ``tf.random.shuffle`` of the
-    indices, then applies ``cutmix_sequence`` per-pair via ``tf.map_fn``.
-    Returns a callable suitable for ``tf.data.Dataset.map`` after ``.batch()``:
 
-        ((feats_b, mask_b), labels_oh) -> ((feats_b, mask_b), labels_oh_mixed)
+# --------------------------------------------------------------------------- flip
 
-    The 2nd-place asl-signs Kaggle solution (Toporov) flagged CutMix as their
-    strongest single augmentation; 1st-place asl-fingerspelling top-5 all used
-    it too. Per ``cutmix_sequence`` semantics: ``r`` is sampled in
-    ``[alpha, 1-alpha]`` and a fraction ``r`` of A's frames is concatenated
-    with ``(1-r)`` of B's; soft labels are blended by the same ratio.
+def _swap_blocks(x: tf.Tensor, a_idx: list[int], b_idx: list[int]) -> tf.Tensor:
+    """Swap the two blocks of landmarks identified by `a_idx` and `b_idx`."""
+    a = tf.gather(x, a_idx, axis=0)
+    b = tf.gather(x, b_idx, axis=0)
+    x = tf.tensor_scatter_nd_update(x, tf.constant(a_idx)[..., None], b)
+    x = tf.tensor_scatter_nd_update(x, tf.constant(b_idx)[..., None], a)
+    return x
 
-    Args:
-        alpha: lower bound on the mixing ratio. Default 0.3 -> r in [0.3, 0.7].
-            Avoid alpha=0.5 (degenerates to a constant r=0.5).
-        prob: per-batch probability of applying CutMix at all (vs identity).
-            Default 1.0 = always mix when this stage is in the pipeline.
+
+def flip_lr(x: tf.Tensor) -> tf.Tensor:
+    """Mirror x-coordinate and swap left/right anatomical blocks.
+
+    Faithful port of cell 8 of the reference notebook. Operates on raw
+    (T, 543, 3); after the flip the data still represents valid right/left
+    orientation because we swap block memberships.
     """
+    x_, y_, z_ = tf.unstack(x, axis=-1)
+    x_ = 1.0 - x_
+    new_x = tf.stack([x_, y_, z_], axis=-1)
+    # Transpose to (landmarks, T, 3) so per-landmark gather/scatter is along axis 0.
+    new_x = tf.transpose(new_x, [1, 0, 2])
 
-    def _fn(xs, labels_oh):
-        feats, mask = xs
+    new_x = _swap_blocks(new_x, LHAND, RHAND)
+    new_x = _swap_blocks(new_x, LLIP, RLIP)
+    new_x = _swap_blocks(new_x, LPOSE, RPOSE)
+    new_x = _swap_blocks(new_x, LEYE, REYE)
+    new_x = _swap_blocks(new_x, LNOSE, RNOSE)
 
-        def _do():
-            B = tf.shape(feats)[0]
-            perm = tf.random.shuffle(tf.range(B))
-            feats_p = tf.gather(feats, perm)
-            mask_p = tf.gather(mask, perm)
-            labels_p = tf.gather(labels_oh, perm)
+    new_x = tf.transpose(new_x, [1, 0, 2])
+    return new_x
 
-            def _per_item(args):
-                fa, ma, la, fb, mb, lb = args
-                return cutmix_sequence(fa, ma, la, fb, mb, lb, alpha=alpha)
 
-            out = tf.map_fn(
-                _per_item,
-                (feats, mask, labels_oh, feats_p, mask_p, labels_p),
-                fn_output_signature=(
-                    tf.TensorSpec(shape=feats.shape[1:], dtype=feats.dtype),
-                    tf.TensorSpec(shape=mask.shape[1:], dtype=mask.dtype),
-                    tf.TensorSpec(shape=labels_oh.shape[1:], dtype=labels_oh.dtype),
-                ),
-            )
-            return out
+# --------------------------------------------------------------------------- top-level
 
-        do_mix = tf.random.uniform([]) < prob
-        feats_out, mask_out, labels_out = tf.cond(
-            do_mix,
-            _do,
-            lambda: (feats, mask, labels_oh),
-        )
-        return (feats_out, mask_out), labels_out
+def augment_fn(x: tf.Tensor, always: bool = False, max_len: int | None = None) -> tf.Tensor:
+    """Apply the full augmentation suite to (T, 543, 3) raw landmarks.
 
-    return _fn
+    `always=True` forces every aug to fire; used for visualization/testing.
+    `max_len`, when set, drives the `temporal_crop` step.
+    """
+    if tf.random.uniform(()) < 0.8 or always:
+        x = resample(x, (0.5, 1.5))
+    if tf.random.uniform(()) < 0.5 or always:
+        x = flip_lr(x)
+    if max_len is not None:
+        x = temporal_crop(x, max_len)
+    if tf.random.uniform(()) < 0.75 or always:
+        x = spatial_random_affine(x)
+    if tf.random.uniform(()) < 0.5 or always:
+        x = temporal_mask(x)
+    if tf.random.uniform(()) < 0.5 or always:
+        x = spatial_mask(x)
+    return x
