@@ -1,9 +1,10 @@
 "use client";
 
 import { ArrowLeft, HandWaving, SpeakerHigh } from "@phosphor-icons/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   forwardRef,
+  useEffect,
   useRef,
   useState,
   type FormEvent,
@@ -29,11 +30,20 @@ const rail = "h-px w-full shrink-0 bg-[#e3e3e2]";
 
 export function StartForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialRoom = (searchParams.get("room") ?? "").trim();
   const nameRef = useRef<HTMLInputElement>(null);
   const deafRoleRef = useRef<HTMLButtonElement>(null);
   const [name, setName] = useState("");
   const [role, setRole] = useState<Role | null>(null);
-  const [roomCode, setRoomCode] = useState("");
+  const [roomCode, setRoomCode] = useState(initialRoom);
+
+  // If the user arrives via a shared room link (`/start?room=…`),
+  // prompt them to fill in the missing pieces rather than create a new room.
+  const [joinHint, setJoinHint] = useState(initialRoom.length > 0);
+  useEffect(() => {
+    if (initialRoom.length > 0) nameRef.current?.focus();
+  }, [initialRoom]);
   const [submitting, setSubmitting] = useState(false);
   const [nameHint, setNameHint] = useState(false);
   const [roleHint, setRoleHint] = useState(false);
@@ -161,10 +171,21 @@ export function StartForm() {
           <span className="h-px min-w-0 flex-1 bg-[#e3e3e2]" />
         </div>
 
+        {joinHint ? (
+          <p className="t-meta text-sc-text-2">
+            Joining room{" "}
+            <code className="font-mono text-sc-text">{initialRoom}</code> — add
+            your name and role, then press Join.
+          </p>
+        ) : null}
+
         <div className="flex gap-2">
           <input
             value={roomCode}
-            onChange={(e) => setRoomCode(e.target.value)}
+            onChange={(e) => {
+              setRoomCode(e.target.value);
+              setJoinHint(false);
+            }}
             placeholder="room code"
             maxLength={32}
             className={cn(inputBase, "flex-1")}

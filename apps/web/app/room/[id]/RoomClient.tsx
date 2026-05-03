@@ -107,21 +107,12 @@ export function RoomClient({ roomId }: RoomClientProps) {
     clearCredentials,
   ]);
 
-  if (!role) {
-    return (
-      <main className="flex min-h-dvh items-center justify-center bg-sc-bg px-6 py-12">
-        <div className="flex flex-col items-center gap-4">
-          <p className="t-body text-sc-text-2">Pick a role to enter this room.</p>
-          <Link
-            href="/start"
-            className="sc-luminous inline-flex h-10 items-center rounded-sc-full px-5 t-label"
-          >
-            Go to start
-          </Link>
-        </div>
-      </main>
-    );
-  }
+  useEffect(() => {
+    if (role) return;
+    router.replace(`/start?room=${encodeURIComponent(roomId)}`);
+  }, [role, roomId, router]);
+
+  if (!role) return null;
 
   const handleJoin = async (d: LobbyDeviceState): Promise<void> => {
     setDevices(d);

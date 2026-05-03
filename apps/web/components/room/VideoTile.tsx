@@ -337,7 +337,7 @@ function InviteCopy({ roomCode, inviteUrl }: InviteCopyProps) {
         ) : (
           <Copy size={14} weight="bold" />
         )}
-        {copied ? "Copied" : "Copy link"}
+        {copied ? "Copied" : "Copy"}
       </button>
     </div>
   );
