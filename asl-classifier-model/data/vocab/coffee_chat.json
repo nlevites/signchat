@@ -1,0 +1,32 @@
+{
+  "name": "Coffee Chat",
+  "version": 1,
+  "notes": "Locked 25-sign lexicon for the Phase 1 tight-cut model and the live demo's 10-beat 'Coffee Chat' script. Each entry is a canonical English label; curate_vocab.py expands to dataset-specific aliases (case, hyphen-stripping, ASL-LEX numeric variant suffixes) when matching against cache vocab.json files.",
+  "signs": [
+    "ME",
+    "YOU",
+    "MY",
+    "YOUR",
+    "HELLO",
+    "THANK-YOU",
+    "GOODBYE",
+    "YES",
+    "NO",
+    "GOOD",
+    "IMPORTANT",
+    "WANT",
+    "LIKE",
+    "LOVE",
+    "LEARN",
+    "NAME",
+    "FAMILY",
+    "FRIEND",
+    "DEAF",
+    "ASL",
+    "COFFEE",
+    "COMPUTER",
+    "WORK",
+    "HAPPY",
+    "NERVOUS"
+  ]
+}

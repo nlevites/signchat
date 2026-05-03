@@ -1,0 +1,73 @@
+# Shared defaults. Other configs inherit and override via `extends: base.yaml`.
+#
+# These defaults reproduce the asl-signs Kaggle 1st/2nd-place winners' recipe:
+#   * shorter sequences (max_len=160) -- most PopSign clips are 30-100 frames
+#   * smaller model (~5-8M params) -- the TFLite cap that forced this in the
+#     competition turned out to be the right size for landmark-only ISLR
+#   * position+velocity+acceleration channels (n_channels=9)
+#   * CutMix as the strongest single augmentation (2nd-place writeup)
+
+experiment:
+  name: base
+  notes: ""
+
+data:
+  vocab:
+    - hello
+    - thanks
+    - please
+  cache_dir: data/cache/landmarks
+  smoke_dir: data/smoke
+  splits_path: data/splits/held_out_signer.json
+  max_len: 160
+  n_landmarks: 130        # 76 face + 12 pose + 42 hands
+  n_channels: 9           # xyz + delta_xyz + accel_xyz
+  use_motion_deltas: true # first-difference -> channels 3-5
+  use_acceleration: true  # second-difference -> channels 6-8
+  use_smoke: false        # if true, train.py only loads data/smoke/
+
+model:
+  name: conformer         # mlp_stub | conformer
+  dim: 192
+  n_blocks: 6
+  n_heads: 6              # must divide dim (192 / 6 = 32)
+  conv_kernel: 31
+  ffn_expansion: 4
+  dropout: 0.3
+
+augment:
+  spatial_affine:
+    enabled: true
+    max_rot_deg: 15
+    max_scale: 0.1
+    max_shift: 0.1
+  time_resample:
+    enabled: true
+    min_ratio: 0.8
+    max_ratio: 1.2
+  temporal_mask:
+    enabled: true
+    max_mask_frames: 32
+    n_masks: 2
+  finger_drop:
+    enabled: true
+    prob: 0.1
+  cutmix:
+    enabled: true
+    alpha: 0.3                     # cutmix_sequence samples r in [alpha, 1-alpha]
+    prob: 1.0                      # per-batch probability of any mixing
+
+train:
+  batch_size: 128
+  epochs: 100
+  lr: 3e-4
+  weight_decay: 1e-5
+  label_smoothing: 0.1
+  schedule: cosine
+  warmup_epochs: 5
+  early_stop_patience: 10
+  resume_from: null
+
+eval:
+  metric: val_signer_acc  # what we early-stop and rank on
+  benchmark_latency: true

@@ -1,0 +1,17 @@
+{
+  "name": "Coffee Chat backup pool",
+  "version": 1,
+  "notes": "Substitutes for any of the 25 primary signs that fail the >=20 train-clip / >=2 val-signer threshold. When swapping, also update the corresponding script beat in the Coffee Chat demo lexicon.",
+  "signs": [
+    "NICE",
+    "HELP",
+    "EVERY-DAY",
+    "STUDENT",
+    "TEACHER",
+    "FATHER",
+    "MOTHER",
+    "WATER",
+    "FOOD",
+    "HUNGRY"
+  ]
+}
