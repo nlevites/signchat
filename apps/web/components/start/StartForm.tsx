@@ -40,7 +40,6 @@ export function StartForm() {
 
   // If the user arrives via a shared room link (`/start?room=…`),
   // prompt them to fill in the missing pieces rather than create a new room.
-  const [joinHint, setJoinHint] = useState(initialRoom.length > 0);
   useEffect(() => {
     if (initialRoom.length > 0) nameRef.current?.focus();
   }, [initialRoom]);
@@ -155,50 +154,57 @@ export function StartForm() {
 
       <div className={rail} aria-hidden />
 
-      <div className="flex flex-1 flex-col gap-3 pt-6">
-        <button
-          type="button"
-          disabled={submitting}
-          onClick={handleCreateRoom}
-          className="sc-luminous inline-flex h-12 w-full items-center justify-center rounded-sc-full px-6 text-[15px] font-medium transition-[transform,filter] duration-200 hover:-translate-y-px hover:brightness-105 active:translate-y-0 disabled:opacity-40 disabled:pointer-events-none"
-        >
-          Create new room
-        </button>
-
-        <div className="my-1 flex items-center gap-3 text-sc-text-3">
-          <span className="h-px min-w-0 flex-1 bg-[#e3e3e2]" />
-          <span className="t-meta uppercase">or join existing</span>
-          <span className="h-px min-w-0 flex-1 bg-[#e3e3e2]" />
-        </div>
-
-        {joinHint ? (
+      {initialRoom.length > 0 ? (
+        /* shared-link path: room id is known, no create flow makes sense.
+         * fill name + role and the form's onSubmit goes to /room/<id>. */
+        <div className="flex flex-1 flex-col gap-3 pt-6">
           <p className="t-meta text-sc-text-2">
             Joining room{" "}
-            <code className="font-mono text-sc-text">{initialRoom}</code> — add
-            your name and role, then press Join.
+            <code className="font-mono text-sc-text">{initialRoom}</code>
           </p>
-        ) : null}
-
-        <div className="flex gap-2">
-          <input
-            value={roomCode}
-            onChange={(e) => {
-              setRoomCode(e.target.value);
-              setJoinHint(false);
-            }}
-            placeholder="room code"
-            maxLength={32}
-            className={cn(inputBase, "flex-1")}
-          />
           <button
             type="submit"
             disabled={!canJoin || submitting}
-            className="sc-btn-secondary inline-flex h-10 items-center justify-center rounded-sc-full px-5 t-label hover:-translate-y-px disabled:opacity-40 disabled:pointer-events-none"
+            className="sc-luminous inline-flex h-12 w-full items-center justify-center rounded-sc-full px-6 text-[15px] font-medium transition-[transform,filter] duration-200 hover:-translate-y-px hover:brightness-105 active:translate-y-0 disabled:opacity-40 disabled:pointer-events-none"
           >
-            Join
+            Join room
           </button>
         </div>
-      </div>
+      ) : (
+        <div className="flex flex-1 flex-col gap-3 pt-6">
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={handleCreateRoom}
+            className="sc-luminous inline-flex h-12 w-full items-center justify-center rounded-sc-full px-6 text-[15px] font-medium transition-[transform,filter] duration-200 hover:-translate-y-px hover:brightness-105 active:translate-y-0 disabled:opacity-40 disabled:pointer-events-none"
+          >
+            Create new room
+          </button>
+
+          <div className="my-1 flex items-center gap-3 text-sc-text-3">
+            <span className="h-px min-w-0 flex-1 bg-[#e3e3e2]" />
+            <span className="t-meta uppercase">or join existing</span>
+            <span className="h-px min-w-0 flex-1 bg-[#e3e3e2]" />
+          </div>
+
+          <div className="flex gap-2">
+            <input
+              value={roomCode}
+              onChange={(e) => setRoomCode(e.target.value)}
+              placeholder="room code"
+              maxLength={32}
+              className={cn(inputBase, "flex-1")}
+            />
+            <button
+              type="submit"
+              disabled={!canJoin || submitting}
+              className="sc-btn-secondary inline-flex h-10 items-center justify-center rounded-sc-full px-5 t-label hover:-translate-y-px disabled:opacity-40 disabled:pointer-events-none"
+            >
+              Join
+            </button>
+          </div>
+        </div>
+      )}
 
       <button
         type="button"

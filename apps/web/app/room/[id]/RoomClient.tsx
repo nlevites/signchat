@@ -1,7 +1,6 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
@@ -9,18 +8,17 @@ import type {
   ParticipantInfo,
   Role,
 } from "@signchat/contracts";
-import { Logo } from "@/components/ui/Logo";
 import { CaptureControls } from "@/components/room/CaptureControls";
 import { ChatPanel } from "@/components/room/ChatPanel";
 import { ControlBar } from "@/components/room/ControlBar";
-import { ConnectionBadge } from "@/components/room/ConnectionBadge";
 import { DeafSession } from "@/components/room/DeafSession";
 import { DebugView } from "@/components/room/DebugView";
 import { Lobby, type LobbyDeviceState } from "@/components/room/Lobby";
 import { SettingsPanel } from "@/components/room/SettingsPanel";
 import { TranscriptStrip } from "@/components/room/TranscriptStrip";
 import { VideoTile } from "@/components/room/VideoTile";
-import { ViewToggle, type ViewMode } from "@/components/room/ViewToggle";
+import type { ViewMode } from "@/components/room/ViewToggle";
+import { LiveLandmarkOverlay } from "@/components/room/debug/LiveLandmarkOverlay";
 import { LogStream } from "@/components/room/debug/LogStream";
 import { useCredentialsStore } from "@/lib/credentials/store";
 import { useDevWindowHandle } from "@/lib/dev-window";
@@ -213,6 +211,9 @@ function ActiveRoom({
   const [view, setView] = useState<ViewMode>("production");
   const [chatOpen, setChatOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /** which tile fills the main viewing area. clicking the small PiP swaps
+   * them; the active speaker still hears the remote audio either way. */
+  const [mainTile, setMainTile] = useState<"remote" | "local">("remote");
 
   const identity = useRoomStore((s) => s.identity);
   const prefsMode = usePreferencesStore((s) => s.mode);
@@ -230,6 +231,8 @@ function ActiveRoom({
     remoteRole,
     micEnabled,
     camEnabled,
+    remoteMicEnabled,
+    remoteCamEnabled,
     toggleMic,
     toggleCamera,
     leave,
@@ -309,78 +312,112 @@ function ActiveRoom({
     useCredentialsStore.getState().openrouter !== null &&
     useCredentialsStore.getState().elevenlabs !== null;
 
+  const remoteHasParticipant = !!(
+    remoteVideoTrack ||
+    remoteAudioTrack ||
+    remoteName ||
+    remoteIdentity
+  );
+  /** main slot can only show the remote when the remote is actually here.
+   * if the user picked local-as-main they keep that even before the peer
+   * joins; once the peer joins, an empty remote tile is never shown big. */
+  const showLocalAsMain = mainTile === "local" || !remoteHasParticipant;
+
+  const remoteTileNode = remoteHasParticipant ? (
+    <VideoTile
+      label={`${remoteName ?? "guest"}${remoteRole ? ` (${remoteRole})` : ""}`}
+      role={remoteRole}
+      videoTrack={remoteVideoTrack}
+      audioTrack={remoteAudioTrack}
+      audioOutputDeviceId={devices.audioOutputDeviceId}
+      tileIdentity={remoteIdentity ?? undefined}
+      tileRole={remoteRole}
+      showHearingPartials={remoteRole === "hearing"}
+      showDeafCaption={remoteRole === "deaf"}
+      connected
+      micOn={remoteMicEnabled ?? true}
+      camOn={remoteCamEnabled ?? true}
+      onClick={mainTile === "remote" ? () => setMainTile("local") : () => setMainTile("remote")}
+    />
+  ) : (
+    <VideoTile empty inviteRoomCode={roomId} inviteUrl={inviteUrl} />
+  );
+
+  const localTileNode = (
+    <VideoTile
+      label={`you · ${role}`}
+      role={role}
+      videoTrack={localVideoTrack}
+      mirrored
+      tileIdentity={identity ?? undefined}
+      tileRole={role}
+      showHearingPartials={role === "hearing"}
+      showDeafCaption={role === "deaf"}
+      connected
+      micOn={micEnabled}
+      camOn={camEnabled}
+      onClick={mainTile === "local" ? () => setMainTile("remote") : () => setMainTile("local")}
+    />
+  );
+
   return (
     <main className="flex h-dvh flex-col overflow-hidden bg-sc-bg text-sc-text">
-      <header
-        className="z-30 flex shrink-0 items-center justify-between gap-3 px-5 py-3 text-white shadow-[0_1px_0_rgba(0,0,0,0.05)]"
-        style={{ background: "var(--sc-accent-gradient)" }}
-      >
-        <div className="flex items-center gap-5">
-          <Link
-            href="/"
-            aria-label="Signchat home"
-            className="rounded-sc-md transition-opacity hover:opacity-90"
-          >
-            <Logo size={48} wordmarkSize={32} surface="overlay" />
-          </Link>
-          <span className="h-7 w-px bg-white/20" aria-hidden />
-          <div className="flex items-center gap-2">
-            <span className="t-meta uppercase text-white/65">Room</span>
-            <code className="font-mono text-[15px] font-medium text-white">
-              {roomId}
-            </code>
-          </div>
-          <ConnectionBadge />
-        </div>
-        <ViewToggle value={view} onChange={setView} />
-      </header>
-
       <div className="flex min-h-0 flex-1 bg-sc-surface-2">
-        <section className="relative flex min-w-0 flex-1 flex-col">
+        <section className="relative flex min-w-0 flex-1 flex-col overflow-y-auto">
+          {/* call-stage wrapper: locked to the section's visible height so
+           * the video tiles and transcript don't compress when DebugView
+           * opens below. DebugView and LogStream live outside this wrapper
+           * and extend the section's scroll instead. */}
+          <div className="flex h-full shrink-0 flex-col">
           <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden px-6 pt-6 pb-24">
-            <div className="grid h-full max-h-full w-full max-w-[1200px] grid-cols-1 content-center gap-4 md:grid-cols-2">
-              <div className="relative">
-                <VideoTile
-                  label={`${displayName} · you (${role})`}
-                  role={role}
-                  videoTrack={localVideoTrack}
-                  mirrored
-                  tileIdentity={identity ?? undefined}
-                  tileRole={role}
-                  showHearingPartials={role === "hearing"}
-                  showDeafCaption={role === "deaf"}
+            {/* Discord-style: one tile fills the main viewing area; the
+             * other floats as a small PiP at bottom-right. clicking either
+             * tile swaps which is which (animated by motion's layoutId).
+             * the max-w-[1200px] wrapper anchors the DeafSession overlay
+             * (token chips + inline preview) to whichever tile is currently
+             * the big one, so the deaf user reads them where their eyes
+             * already are. */}
+            <motion.div
+              layout
+              layoutId="sc-main-tile"
+              transition={{ type: "spring", stiffness: 320, damping: 32 }}
+              className="relative w-full max-w-[1200px]"
+            >
+              {showLocalAsMain ? localTileNode : remoteTileNode}
+
+              {/* Landmark overlay tracks the local tile, not a fixed slot —
+               * so swapping main/PiP doesn't drop the face mesh. */}
+              {view === "debug" && isDeaf && showLocalAsMain ? (
+                <LiveLandmarkOverlay mirror />
+              ) : null}
+
+              {isDeaf ? (
+                <DeafSession
+                  room={room}
+                  localVideoTrack={localVideoTrack}
+                  remoteAudioTrack={remoteAudioTrack}
+                  participantInfo={participantInfo}
+                  recentDialogContext={recentDialogContext}
+                  publish={publish}
                 />
-                {isDeaf ? (
-                  <DeafSession
-                    room={room}
-                    localVideoTrack={localVideoTrack}
-                    remoteAudioTrack={remoteAudioTrack}
-                    participantInfo={participantInfo}
-                    recentDialogContext={recentDialogContext}
-                    publish={publish}
-                  />
-                ) : null}
-              </div>
-              {remoteVideoTrack || remoteAudioTrack || remoteName ? (
-                <VideoTile
-                  label={`${remoteName ?? "guest"}${remoteRole ? ` (${remoteRole})` : ""}`}
-                  role={remoteRole}
-                  videoTrack={remoteVideoTrack}
-                  audioTrack={remoteAudioTrack}
-                  audioOutputDeviceId={devices.audioOutputDeviceId}
-                  tileIdentity={remoteIdentity ?? undefined}
-                  tileRole={remoteRole}
-                  showHearingPartials={remoteRole === "hearing"}
-                  showDeafCaption={remoteRole === "deaf"}
-                />
-              ) : (
-                <VideoTile
-                  empty
-                  inviteRoomCode={roomId}
-                  inviteUrl={inviteUrl}
-                />
-              )}
-            </div>
+              ) : null}
+            </motion.div>
+
+            {/* PiP — the OTHER tile, bottom-right above the controls strip.
+             * shares the layoutId pool with the main tile so the two
+             * positions cross-fade and animate when the user clicks to
+             * swap. */}
+            <motion.div
+              layout
+              layoutId="sc-pip-tile"
+              transition={{ type: "spring", stiffness: 320, damping: 32 }}
+              className="absolute right-6 bottom-28 z-20 w-40 overflow-hidden rounded-sc-xl shadow-sc-xl sm:w-52 md:w-60 lg:w-72"
+            >
+              {showLocalAsMain ? remoteTileNode : localTileNode}
+              {view === "debug" && isDeaf && !showLocalAsMain ? (
+                <LiveLandmarkOverlay mirror />
+              ) : null}
+            </motion.div>
 
             {isDeaf ? (
               <div className="absolute bottom-20 left-1/2 z-30 -translate-x-1/2">
@@ -419,6 +456,7 @@ function ActiveRoom({
           </div>
 
           <TranscriptStrip />
+          </div>
 
           <AnimatePresence>
             {view === "debug" ? (
@@ -430,9 +468,7 @@ function ActiveRoom({
                 transition={{ duration: 0.55, ease: [0.32, 0.72, 0, 1] }}
                 className="overflow-hidden border-t border-sc-border bg-sc-surface"
               >
-                <div className="max-h-[50vh] overflow-y-auto">
-                  <DebugView />
-                </div>
+                <DebugView />
               </motion.div>
             ) : null}
           </AnimatePresence>
@@ -451,6 +487,10 @@ function ActiveRoom({
               <SettingsPanel
                 role={role}
                 onClose={() => setSettingsOpen(false)}
+                roomId={roomId}
+                view={view}
+                onChangeView={setView}
+                inviteUrl={inviteUrl}
               />
             ) : (
               <ChatPanel
