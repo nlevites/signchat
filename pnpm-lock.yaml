@@ -24,6 +24,8 @@ importers:
         specifier: ^8.59.1
         version: 8.59.1(eslint@9.39.4)(typescript@5.9.3)
 
+  packages/contracts: {}
+
 packages:
 
   '@eslint-community/eslint-utils@4.9.1':
