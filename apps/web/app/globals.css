@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+@theme {
+  --color-parchment-canvas: #f2f0eb;
+  --color-ink: #292827;
+  --color-bone: #ffffff;
+  --color-fog: #e3e3e2;
+  --color-driftwood: #dcd7d3;
+  --color-graphite: #666666;
+  --color-aubergine: #421d24;
+  --color-aubergine-deep: #4e242c;
+  --color-iris: #714cb6;
+  --color-indigo-glow: #353088;
+  --color-lavender-chip: #d4c7ff;
+
+  --gradient-hero-dusk: linear-gradient(
+    to left bottom,
+    rgba(168, 164, 216, 0.5),
+    rgba(107, 165, 232, 0.5),
+    rgba(176, 112, 192, 0.6),
+    rgba(144, 136, 208, 0.5)
+  );
+
+  --gradient-spotlight-violet: radial-gradient(circle at 68% 50%, rgba(133, 125, 250, 0.6) 0px, rgba(0, 0, 0, 0) 50%);
+  --gradient-spotlight-pink: radial-gradient(circle at 50% 98%, rgba(255, 51, 102, 0.6) 0px, rgba(0, 0, 0, 0) 50%);
+  --gradient-spotlight-blue: radial-gradient(circle at 93% 50%, rgba(75, 105, 227, 0.5) 0px, rgba(0, 0, 0, 0) 50%);
+  --gradient-spotlight-cyan: radial-gradient(circle at 50% 75%, rgba(104, 222, 255, 0.5) 0px, rgba(0, 0, 0, 0) 50%);
+
+  --font-super-sans-vf: "Inter Variable", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  --text-caption: 12px;
+  --leading-caption: 1.5;
+  --text-body-sm: 14px;
+  --leading-body-sm: 1.5;
+  --text-body: 16px;
+  --leading-body: 1.5;
+  --text-subheading: 18px;
+  --leading-subheading: 1.3;
+  --tracking-subheading: -0.14px;
+  --text-heading-sm: 22px;
+  --leading-heading-sm: 1.25;
+  --tracking-heading-sm: -0.31px;
+  --text-heading: 28px;
+  --leading-heading: 1.2;
+  --tracking-heading: -0.62px;
+  --text-heading-lg: 48px;
+  --leading-heading-lg: 1;
+  --tracking-heading-lg: -1.3px;
+  --text-display: 64px;
+  --leading-display: 0.96;
+  --tracking-display: -1.79px;
+
+  --font-weight-w460: 460;
+  --font-weight-medium: 500;
+  --font-weight-w540: 540;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --spacing-4: 4px;
+  --spacing-8: 8px;
+  --spacing-12: 12px;
+  --spacing-16: 16px;
+  --spacing-20: 20px;
+  --spacing-24: 24px;
+  --spacing-28: 28px;
+  --spacing-32: 32px;
+  --spacing-36: 36px;
+  --spacing-40: 40px;
+  --spacing-48: 48px;
+  --spacing-64: 64px;
+  --spacing-80: 80px;
+  --spacing-96: 96px;
+
+  --radius-button: 8px;
+  --radius-link: 12px;
+  --radius-card: 16px;
+  --radius-card-lg: 24px;
+  --radius-pill: 999px;
+
+  --shadow-focus-iris: rgb(113, 76, 182) 0px 0px 0px 1px inset;
+
+  --motion-fast: 0.12s;
+  --motion-base: 0.2s;
+  --motion-slow: 0.3s;
+  --motion-cinematic: 0.6s;
+
+  --surface-hero: #421d24;
+  --surface-room: #421d24;
+  --surface-canvas: #f2f0eb;
+  --surface-card: #ffffff;
+  --surface-divider: #e3e3e2;
+  --surface-glass: rgba(255, 255, 255, 0.13);
+}
+
+body {
+  font-family: var(--font-super-sans-vf);
+}
+
+*:focus-visible {
+  box-shadow: var(--shadow-focus-iris);
+  outline: none;
+}
