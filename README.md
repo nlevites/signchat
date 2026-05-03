@@ -10,7 +10,7 @@
 [![Live: signchat.org](https://img.shields.io/badge/live-signchat.org-3178c6?style=for-the-badge)](https://signchat.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-43853d?style=for-the-badge)](#license)
 
-#### [Try it now](https://signchat.org/start) &nbsp;·&nbsp; Watch the 60-second demo _(TODO)_ &nbsp;·&nbsp; [Read the architecture](ARCHITECTURE.md)
+#### [Try it now](https://signchat.org/start) &nbsp;·&nbsp; [Watch the 3-minute demo](https://www.youtube.com/watch?v=SENhVVNZQGY) &nbsp;·&nbsp; [Read the architecture](ARCHITECTURE.md)
 
 </div>
 
@@ -46,12 +46,19 @@ you talking.
 > [!TIP]
 > The fastest way to understand Signchat is to **[open it in a browser](https://signchat.org/start)** with a friend on the other side. The whole product is one URL.
 
+<div align="center">
+
+[![Watch the Signchat demo on YouTube](https://img.youtube.com/vi/SENhVVNZQGY/maxresdefault.jpg)](https://www.youtube.com/watch?v=SENhVVNZQGY)
+
+**▶ [Watch the 3-minute demo on YouTube](https://www.youtube.com/watch?v=SENhVVNZQGY)**
+
+</div>
+
 | | |
 | :--- | :--- |
 | **Live app** | <https://signchat.org> |
-| **60-second demo** | _<!-- TODO: paste 60-second demo video URL here -->_ |
+| **3-minute demo** | <https://www.youtube.com/watch?v=SENhVVNZQGY> |
 | **Architecture deep-dive** | [`ARCHITECTURE.md`](ARCHITECTURE.md) (17 sections) |
-| **Demo script** | [`docs/demo-script.txt`](docs/demo-script.txt) |
 
 **What you'll see in the demo:**
 
@@ -139,8 +146,6 @@ sections, mermaid diagrams render inline on GitHub.
   landmark playback and classifier debugging.
 - **[`ARCHITECTURE.md`](ARCHITECTURE.md)** — the canonical 17-section
   spec.
-- **[`docs/demo-script.txt`](docs/demo-script.txt)** — the BeaverHacks
-  demo we recorded against.
 
 ## Quick start
 
