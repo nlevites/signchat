@@ -1,17 +1,13 @@
-"""Fully automated phase1 train on a freshly-provisioned RunPod H200.
+"""Fully automated 1st-place asl-signs train on a freshly-provisioned H200.
 
-Provisions an H200 GPU pod, rsyncs the repo + (optionally) data/cache/ +
-pretrained/ up, runs ``make pretrain-phase1-<suffix>`` in tmux, scps the
-trained weights back, and terminates the pod.
+Provisions an H200 GPU pod, rsyncs the repo up, symlinks the kaggle_islr
+cache from the network volume, runs ``make pretrain-phase1-kaggle`` in tmux,
+scps the trained weights back, and terminates the pod.
 
-Modes (via the required ``--config-suffix``):
+Mode (single supported ``--config-suffix``):
 
-    kaggle         PopSign 250 single-source full train (~$8, ~2 hr).
-    kaggle_smoke   PopSign 250 2-epoch drift gate (~$3, ~45 min).
-    broad          Cross-dataset broad pretrain (~$16-23, ~4-6 hr).
-    tight          Tight head-swap from broad (~$6, ~1.5 hr). Requires
-                   pretrained/phase1_broad/ to exist locally; that
-                   checkpoint is rsync'd up so resume_from resolves.
+    kaggle         PopSign 250 hoyso48 port. 300 epochs by default. ~$16, ~4 hr.
+                   Override with ``--epochs 5`` for a $1 smoke.
 
 Examples:
     # Recommended: prefix with caffeinate so the Mac stays awake while
@@ -20,10 +16,10 @@ Examples:
         --config-suffix kaggle --network-volume-id 412s5n8qkh
 
     caffeinate -dimsuw $$ python -u scripts/runpod_train.py \\
-        --config-suffix broad --network-volume-id 412s5n8qkh --epochs 6
+        --config-suffix kaggle --network-volume-id 412s5n8qkh --epochs 5
 
 Cost guardrails (defaults; override via CLI):
-    - Wall-clock timeout: per-mode (kaggle 180 min, kaggle_smoke 90, etc.)
+    - Wall-clock timeout: 360 min (6 hr; 300 epochs typically lands in ~4 hr)
     - Idle (no stdout) timeout: 60 min
     - Periodic cost-so-far ping every 5 min
 
@@ -62,13 +58,16 @@ from typing import Callable, Optional
 # manually.
 GPU_FALLBACK_PHASE1 = ["NVIDIA H200"]
 
-# Per-GPU batch size override.
+# Per-GPU batch size override. hoyso48's effective batch is 64 * 8 replicas
+# = 512; we run on a single H200 at the same effective batch so optimizer
+# dynamics match. The model is tiny (~1.7M params) so 512 fits trivially in
+# 141 GB H200 VRAM. Smaller GPUs scale down proportionally.
 BATCH_BY_GPU: dict[str, int] = {
-    "NVIDIA H200":             256,   # 141 GB VRAM
-    "NVIDIA H100 80GB HBM3":   256,
-    "NVIDIA A100 80GB PCIe":   256,
-    "NVIDIA A100-SXM4-40GB":   192,
-    "NVIDIA GeForce RTX 4090": 128,
+    "NVIDIA H200":             512,   # 141 GB VRAM
+    "NVIDIA H100 80GB HBM3":   512,   # 80 GB
+    "NVIDIA A100 80GB PCIe":   384,
+    "NVIDIA A100-SXM4-40GB":   256,
+    "NVIDIA GeForce RTX 4090": 192,   # 24 GB
 }
 
 # Hourly cost estimate per GPU (USD). RunPod on-demand prices fluctuate; these
@@ -570,9 +569,6 @@ def cleanup_guard(pod_id: str, runpod_key: str,
 
 _PHASE1_TARGETS: dict[str, tuple[str, str]] = {
     # mode -> (Makefile target, pretrained subdir to scp back)
-    "phase1_broad":        ("pretrain-phase1-broad",        "phase1_broad"),
-    "phase1_tight":        ("pretrain-phase1-tight",        "phase1_tight"),
-    "phase1_kaggle_smoke": ("pretrain-phase1-kaggle-smoke", "phase1_kaggle_smoke"),
     "phase1_kaggle":       ("pretrain-phase1-kaggle",       "phase1_kaggle"),
 }
 
@@ -654,36 +650,22 @@ def main():
 
     parser.add_argument(
         "--config-suffix", required=True,
-        choices=("broad", "tight", "kaggle_smoke", "kaggle"),
-        help="Which phase1 recipe to run: kaggle | kaggle_smoke (PopSign 250 "
-             "primary) or broad | tight (cross-dataset secondary). The script "
-             "rsyncs data/cache/ + pretrained/ up to the pod, then invokes "
-             "`make pretrain-phase1-<suffix>`. tight ALSO rsyncs the "
-             "pretrained/phase1_broad/ checkpoint up so the resume_from path "
-             "resolves on the pod."
+        choices=("kaggle",),
+        help="Which recipe to run. Currently only 'kaggle' (the hoyso48 "
+             "1st-place port to PopSign 250). The script rsyncs the repo "
+             "up, symlinks the kaggle_islr cache from the volume, then "
+             "invokes `make pretrain-phase1-kaggle`."
     )
     args = parser.parse_args()
 
     # Map --config-suffix to a mode name. Mode strings flow through to
-    # phase1 cache-checks, rsync paths, and make-target dispatch.
-    mode = {
-        "broad":         "phase1_broad",
-        "tight":         "phase1_tight",
-        "kaggle_smoke":  "phase1_kaggle_smoke",
-        "kaggle":        "phase1_kaggle",
-    }[args.config_suffix]
+    # rsync paths and make-target dispatch.
+    mode = {"kaggle": "phase1_kaggle"}[args.config_suffix]
     gpu_fallback = GPU_FALLBACK_PHASE1
     disk_gb = CONTAINER_DISK_GB_DEFAULT
     if args.timeout == 90:
-        # broad ~4 hr; tight ~1.5 hr; kaggle_smoke ~45 min (2 epochs on
-        # ~95k clips); kaggle ~2 hr (30 epochs of the smaller config).
-        # Cap each with headroom.
-        args.timeout = {
-            "phase1_broad":         480,
-            "phase1_tight":         180,
-            "phase1_kaggle_smoke":  90,
-            "phase1_kaggle":        180,
-        }[mode]
+        # 300 epochs typically lands in ~4 hr on H200; cap at 6 hr.
+        args.timeout = 360
     if args.idle_timeout == 15:
         args.idle_timeout = 60
     use_tmux_for_run = True
@@ -710,23 +692,6 @@ def main():
         sizes_gb = sum(p.stat().st_size for p in cache_root.rglob("*") if p.is_file()) / 1e9
         print(f"[runpod-train] local cache to upload: "
               f"{[p.parent.name for p in cached]} (~{sizes_gb:.2f} GB total)")
-    if mode == "phase1_tight":
-        # Tight mode resumes from pretrained/phase1_broad/best.weights.h5; the
-        # rsync path below will pick it up too, but we sanity-check here so a
-        # missing-broad-checkpoint error fails BEFORE pod provisioning.
-        broad_ckpt = Path("pretrained/phase1_broad/best.weights.h5")
-        if not broad_ckpt.exists():
-            sys.exit(
-                f"ERROR: --config-suffix tight requires {broad_ckpt} to exist "
-                f"locally (will be rsync'd up). Run --config-suffix broad first."
-            )
-        broad_sidecar = Path("pretrained/phase1_broad/vocab.json")
-        if not broad_sidecar.exists():
-            print(f"[runpod-train] WARN {broad_sidecar} missing; tight will work "
-                  "but the demo's strict-load will fail without a sidecar from "
-                  "the broad model too. Re-train broad after the latest train.py "
-                  "edit lands on the pod.")
-
     ephemeral = make_ephemeral_keypair()
     atexit.register(cleanup_ephemeral_key, ephemeral)
 
@@ -827,14 +792,6 @@ def main():
                 remote="/workspace/SignChatModel/data/cache/",
                 excludes=["__pycache__"],
             )
-        if mode == "phase1_tight":
-            print("[runpod-train] uploading pretrained/phase1_broad/ to pod (resume_from)...")
-            ssh.rsync_up(
-                local="pretrained/phase1_broad/",
-                remote="/workspace/SignChatModel/pretrained/phase1_broad/",
-                excludes=[],
-            )
-
         batch_size = BATCH_BY_GPU.get(pod.gpu_name, 128)
         print(f"[runpod-train] using BATCH_SIZE={batch_size} for GPU '{pod.gpu_name}'")
 

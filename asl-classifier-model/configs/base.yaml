@@ -1,73 +1,53 @@
-# Shared defaults. Other configs inherit and override via `extends: base.yaml`.
+# Base config for the hoyso48 1st-place asl-signs port.
 #
-# These defaults reproduce the asl-signs Kaggle 1st/2nd-place winners' recipe:
-#   * shorter sequences (max_len=160) -- most PopSign clips are 30-100 frames
-#   * smaller model (~5-8M params) -- the TFLite cap that forced this in the
-#     competition turned out to be the right size for landmark-only ISLR
-#   * position+velocity+acceleration channels (n_channels=9)
-#   * CutMix as the strongest single augmentation (2nd-place writeup)
+# Faithful copy of cell 19 of the reference notebook:
+#   https://github.com/hoyso48/Google---Isolated-Sign-Language-Recognition-1st-place-solution/blob/main/ISLR_1st_place_Hoyeol_Sohn.ipynb
+#
+# Key choices that diverge from a generic recipe (so don't "fix" them):
+#   - max_len=384 (most clips fit, the rest are temporally cropped)
+#   - 6 channels = (x, y, dx, dy, dx2_x, dx2_y); z is dropped on purpose
+#   - Lookahead-RectifiedAdam (sma_threshold=4, sync_period=5)
+#   - OneCycleLR with warmup_epochs=0, decay_type=cosine, lr=4e-3 peak
+#     (5e-4 * 8 replicas in the original; we run on a single H200 at the
+#     same effective batch=512 so the same peak lr applies)
+#   - weight_decay=0.1 follows the same OneCycle shape as the LR
+#   - AWP (delta=0.2) starting epoch 15
+#   - LateDropout(0.8) starting epoch 15
 
 experiment:
   name: base
   notes: ""
 
 data:
-  vocab:
-    - hello
-    - thanks
-    - please
-  cache_dir: data/cache/landmarks
-  smoke_dir: data/smoke
-  splits_path: data/splits/held_out_signer.json
-  max_len: 160
-  n_landmarks: 130        # 76 face + 12 pose + 42 hands
-  n_channels: 9           # xyz + delta_xyz + accel_xyz
-  use_motion_deltas: true # first-difference -> channels 3-5
-  use_acceleration: true  # second-difference -> channels 6-8
-  use_smoke: false        # if true, train.py only loads data/smoke/
+  vocab: auto                     # union of cache_dir/vocab.json files
+  cache_dir: data/cache/kaggle_islr
+  splits_path: data/splits/kaggle_islr.json
+  max_len: 384
 
 model:
-  name: conformer         # mlp_stub | conformer
-  dim: 192
-  n_blocks: 6
-  n_heads: 6              # must divide dim (192 / 6 = 32)
-  conv_kernel: 31
-  ffn_expansion: 4
-  dropout: 0.3
-
-augment:
-  spatial_affine:
-    enabled: true
-    max_rot_deg: 15
-    max_scale: 0.1
-    max_shift: 0.1
-  time_resample:
-    enabled: true
-    min_ratio: 0.8
-    max_ratio: 1.2
-  temporal_mask:
-    enabled: true
-    max_mask_frames: 32
-    n_masks: 2
-  finger_drop:
-    enabled: true
-    prob: 0.1
-  cutmix:
-    enabled: true
-    alpha: 0.3                     # cutmix_sequence samples r in [alpha, 1-alpha]
-    prob: 1.0                      # per-batch probability of any mixing
+  dim: 192                         # 384 doubles depth; only set on big-model runs
+  kernel_size: 17                  # depthwise 1D conv kernel
+  transformer_expand: 2            # FFN expand ratio inside transformer block
+  conv_drop: 0.2                   # dropout inside Conv1DBlock
+  late_drop: 0.8                   # LateDropout rate before classifier
 
 train:
-  batch_size: 128
-  epochs: 100
-  lr: 3e-4
-  weight_decay: 1e-5
+  batch_size: 512                  # 8 TPU * 64 in original; H200 fits this fine
+  epochs: 300
+  lr: 4.0e-3                       # 5e-4 * 8 replicas
+  lr_min: 1.0e-6
+  weight_decay: 0.1
+  warmup_epochs: 0                 # original sets warmup=0 (cell 19)
+  warmup_type: linear
+  decay_type: cosine
   label_smoothing: 0.1
-  schedule: cosine
-  warmup_epochs: 5
-  early_stop_patience: 10
+  awp: true
+  awp_lambda: 0.2
+  awp_start_epoch: 15
+  dropout_start_epoch: 15
+  early_stop_patience: 0           # 0 = no early stop (300 epochs is the budget)
   resume_from: null
 
 eval:
-  metric: val_signer_acc  # what we early-stop and rank on
+  metric: val_signer_acc
   benchmark_latency: true

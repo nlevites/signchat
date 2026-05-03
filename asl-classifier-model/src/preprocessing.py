@@ -1,285 +1,136 @@
-"""Landmark preprocessing pipeline.
+"""Per-clip preprocessing for the hoyso48 1st-place port.
 
-Mirrors the Kaggle ASL Fingerspelling 1st-place recipe:
-  1. Drop frames where both hands are fully NaN.
-  2. Handedness canonicalize: if left hand has fewer NaNs, mirror x and swap.
-  3. Subset to 130 landmarks (76 face + 12 pose + 42 hands).
-  4. Per-clip mean/std normalize using non-NaN values; fallback mean=[0.5, 0.5, 0].
-  5. Replace remaining NaN with 0.
-  6. Resize temporally to a fixed length (default 384) and produce a mask.
+Faithful port of cell 7 of the reference notebook:
+    https://github.com/hoyso48/Google---Isolated-Sign-Language-Recognition-1st-place-solution/blob/main/ISLR_1st_place_Hoyeol_Sohn.ipynb
 
-We provide two implementations:
-  - `preprocess_numpy(...)` for offline caching (used by record_clips and the
-    WLASL extractor). Operates on full (T, 543, 3) arrays.
-  - `Preprocess(tf.keras.layers.Layer)` so the same logic lives inside the
-    SavedModel/TFLite graph at inference time.
+Pipeline (operates on raw (T, 543, 3) MediaPipe Holistic landmarks in our
+LOCAL [Pose, Face, LHand, RHand] cache layout):
+
+    1. NaN-mean center using the nose-tip reference (landmark 17 in the
+       original Kaggle row order, local index 50). If the reference is
+       all-NaN, fall back to 0.5 (image-center).
+    2. Gather only the 118 POINT_LANDMARKS the model uses.
+    3. NaN-std normalize.
+    4. Drop z; keep only (x, y).
+    5. Compute first-difference dx (1-step) and second-difference dx2
+       (2-step), each padded to length T at the tail.
+    6. Concat along the last axis: [x, dx, dx2] -> shape (T, 6 * NUM_NODES).
+    7. Replace any remaining NaN with 0.
+
+Output shape is (T, 708) for NUM_NODES=118. Note hoyso48's preprocessing
+intentionally drops z entirely; only the 6 channels (x, y, dx, dy, dx2_x,
+dx2_y) are passed to the model.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import tensorflow as tf
 
-import numpy as np
-
-from . import landmarks as lm
-
-if TYPE_CHECKING:
-    import tensorflow as tf  # only for type hints; real import is lazy below
-
-
-def _nan_count(arr: np.ndarray) -> np.ndarray:
-    return np.isnan(arr).any(axis=-1).sum(axis=-1)
+from .landmarks import (
+    CHANNELS,
+    NOSE_REF_INDEX,
+    NUM_NODES,
+    POINT_LANDMARKS,
+)
 
 
-def preprocess_numpy(holistic: np.ndarray, max_len: int = 384,
-                     use_motion_deltas: bool = True,
-                     use_acceleration: bool = False,
-                     ) -> tuple[np.ndarray, np.ndarray]:
-    """Run the full preprocessing pipeline on a single clip.
+PAD = -100.0
 
-    Args:
-        holistic: array of shape (T, 543, 3), x/y/z, NaN allowed.
-        max_len: target temporal length.
-        use_motion_deltas: if True, concatenate first-difference along time as
-            channels 3..5 -> output channels = 6. Every Kaggle ASL Fingerspelling
-            top-5 used motion features; we left them out originally as
-            "premature complexity" and added them back in Phase 1.
-        use_acceleration: if True (and use_motion_deltas), append second-
-            difference along time as channels 6..8 -> output channels = 9.
-            Required by 1st place asl-signs Kaggle solution (hoyso48 was
-            explicit about "position + velocity + acceleration"). No-op
-            unless use_motion_deltas is also True (acceleration is the
-            derivative of velocity; computing without storing velocity
-            would require a separate buffer).
 
-    Returns:
-        features: (max_len, 130, C) float32, no NaN.
-                  C = 9 with deltas + accel, 6 with deltas only, 3 with neither.
-        mask:     (max_len,) bool; True where a real frame exists.
+def tf_nan_mean(x: tf.Tensor, axis=0, keepdims: bool = False) -> tf.Tensor:
+    """NaN-aware mean along `axis`. Replaces NaNs with 0 in the numerator and
+    counts only non-NaN entries in the denominator. Faithful copy of cell 7."""
+    is_nan = tf.math.is_nan(x)
+    num = tf.reduce_sum(tf.where(is_nan, tf.zeros_like(x), x), axis=axis, keepdims=keepdims)
+    den = tf.reduce_sum(tf.where(is_nan, tf.zeros_like(x), tf.ones_like(x)),
+                        axis=axis, keepdims=keepdims)
+    return num / den
+
+
+def tf_nan_std(x: tf.Tensor, center=None, axis=0, keepdims: bool = False) -> tf.Tensor:
+    """NaN-aware std along `axis` around an optional `center`."""
+    if center is None:
+        center = tf_nan_mean(x, axis=axis, keepdims=True)
+    d = x - center
+    return tf.math.sqrt(tf_nan_mean(d * d, axis=axis, keepdims=keepdims))
+
+
+class Preprocess(tf.keras.layers.Layer):
+    """tf.keras layer that maps raw (T, 543, 3) landmarks -> (T, 708) features.
+
+    Faithful port of hoyso48's `Preprocess`. Optionally truncates to `max_len`
+    frames (caller-controlled; the augment pipeline already does temporal_crop
+    so this is normally a no-op).
     """
-    if use_acceleration and not use_motion_deltas:
-        raise ValueError("use_acceleration=True requires use_motion_deltas=True")
-    if use_acceleration:
-        n_ch = 9
-    elif use_motion_deltas:
-        n_ch = 6
-    else:
-        n_ch = 3
-    if holistic.ndim != 3 or holistic.shape[1:] != (lm.N_TOTAL, 3):
-        raise ValueError(f"expected (T, 543, 3); got {holistic.shape}")
-    arr = holistic.astype(np.float32, copy=True)
 
-    lhand = arr[:, lm.LHAND_OFFSET:lm.LHAND_OFFSET + lm.N_HAND]
-    rhand = arr[:, lm.RHAND_OFFSET:lm.RHAND_OFFSET + lm.N_HAND]
-    keep = ~(np.isnan(lhand).all(axis=(1, 2)) & np.isnan(rhand).all(axis=(1, 2)))
-    if keep.any():
-        arr = arr[keep]
+    def __init__(self, max_len: int | None = None,
+                 point_landmarks: list[int] | None = None,
+                 nose_ref_index: int = NOSE_REF_INDEX, **kwargs):
+        super().__init__(**kwargs)
+        self.max_len = max_len
+        self.point_landmarks = list(point_landmarks) if point_landmarks is not None else list(POINT_LANDMARKS)
+        self.nose_ref_index = int(nose_ref_index)
 
-    if arr.shape[0] == 0:
-        feats = np.zeros((max_len, 130, n_ch), dtype=np.float32)
-        mask = np.zeros((max_len,), dtype=bool)
-        return feats, mask
-
-    if _nan_count(arr[:, lm.LHAND_OFFSET:lm.LHAND_OFFSET + lm.N_HAND]) \
-            .sum() < _nan_count(arr[:, lm.RHAND_OFFSET:lm.RHAND_OFFSET + lm.N_HAND]).sum():
-        arr[..., 0] = -arr[..., 0]
-        lhand_block = arr[:, lm.LHAND_OFFSET:lm.LHAND_OFFSET + lm.N_HAND].copy()
-        rhand_block = arr[:, lm.RHAND_OFFSET:lm.RHAND_OFFSET + lm.N_HAND].copy()
-        arr[:, lm.LHAND_OFFSET:lm.LHAND_OFFSET + lm.N_HAND] = rhand_block
-        arr[:, lm.RHAND_OFFSET:lm.RHAND_OFFSET + lm.N_HAND] = lhand_block
-
-    arr = arr[:, lm.SELECTED_COLUMNS]
-
-    flat = arr.reshape(-1, 3)
-    valid = ~np.isnan(flat).any(axis=-1)
-    if valid.any():
-        mean = np.nanmean(flat[valid], axis=0)
-        std = np.nanstd(flat[valid], axis=0)
-    else:
-        mean = np.array([0.5, 0.5, 0.0], dtype=np.float32)
-        std = np.array([1.0, 1.0, 1.0], dtype=np.float32)
-    std = np.where(std < 1e-6, 1.0, std)
-    arr = (arr - mean) / std
-    arr = np.where(np.isnan(arr), 0.0, arr).astype(np.float32)
-
-    t = arr.shape[0]
-    if t == max_len:
-        feats = arr
-        mask = np.ones((max_len,), dtype=bool)
-    elif t > max_len:
-        idx = np.linspace(0, t - 1, max_len).round().astype(np.int64)
-        feats = arr[idx]
-        mask = np.ones((max_len,), dtype=bool)
-    else:
-        pad = np.zeros((max_len - t, 130, 3), dtype=np.float32)
-        feats = np.concatenate([arr, pad], axis=0)
-        mask = np.concatenate([np.ones(t, dtype=bool), np.zeros(max_len - t, dtype=bool)])
-
-    if use_motion_deltas:
-        # First-difference along time, padded with zeros for the first frame so
-        # the channel count is uniform across the sequence. Computed AFTER
-        # temporal resize so deltas reflect the same time grid the model sees.
-        # Padding frames (mask==False) get delta=0 too, which is fine since the
-        # model already ignores them via the attention/pool masks.
-        deltas = np.zeros_like(feats)
-        deltas[1:] = feats[1:] - feats[:-1]
-        if use_acceleration:
-            # Second-difference along time = derivative of velocity. Same
-            # zero-pad-first-frame convention; channels 6..8 are accel_xyz.
-            accel = np.zeros_like(deltas)
-            accel[1:] = deltas[1:] - deltas[:-1]
-            feats = np.concatenate([feats, deltas, accel], axis=-1).astype(np.float32, copy=False)
+    def call(self, inputs: tf.Tensor) -> tf.Tensor:
+        # Accept (T, 543, 3) or (B, T, 543, 3); always return (B, T', C).
+        if tf.rank(inputs) == 3:
+            x = inputs[None, ...]
         else:
-            feats = np.concatenate([feats, deltas], axis=-1).astype(np.float32, copy=False)
+            x = inputs
 
-    return feats, mask
+        # Centering: NaN-mean over T,landmarks of the reference landmark.
+        ref = tf.gather(x, [self.nose_ref_index], axis=2)
+        mean = tf_nan_mean(ref, axis=[1, 2], keepdims=True)
+        mean = tf.where(tf.math.is_nan(mean), tf.constant(0.5, x.dtype), mean)
+
+        # Subset.
+        x = tf.gather(x, self.point_landmarks, axis=2)               # (B, T, P, 3)
+        std = tf_nan_std(x, center=mean, axis=[1, 2], keepdims=True)
+        x = (x - mean) / std
+
+        if self.max_len is not None:
+            x = x[:, : self.max_len]
+
+        length = tf.shape(x)[1]
+        # Drop z. Keep only (x, y).
+        x = x[..., :2]                                               # (B, T, P, 2)
+
+        # First-difference (1-step) and second-difference (2-step). Both
+        # padded at the tail to length T so the time axis stays aligned.
+        dx = tf.cond(
+            tf.shape(x)[1] > 1,
+            lambda: tf.pad(x[:, 1:] - x[:, :-1], [[0, 0], [0, 1], [0, 0], [0, 0]]),
+            lambda: tf.zeros_like(x),
+        )
+        dx2 = tf.cond(
+            tf.shape(x)[1] > 2,
+            lambda: tf.pad(x[:, 2:] - x[:, :-2], [[0, 0], [0, 2], [0, 0], [0, 0]]),
+            lambda: tf.zeros_like(x),
+        )
+
+        n_pts = len(self.point_landmarks)
+        x = tf.concat([
+            tf.reshape(x, (-1, length, 2 * n_pts)),
+            tf.reshape(dx, (-1, length, 2 * n_pts)),
+            tf.reshape(dx2, (-1, length, 2 * n_pts)),
+        ], axis=-1)                                                  # (B, T, 6 * P)
+
+        x = tf.where(tf.math.is_nan(x), tf.constant(0.0, x.dtype), x)
+        return x
 
 
-# Motion-energy gate for the realtime demo. Defined in src/contract.py to keep
-# the state machine self-contained for tests; re-exported here so the demo
-# imports it from the same module that owns the rest of the buffer-level
-# helpers. Consumers should import either path indifferently.
-try:
-    from .contract import compute_motion_energy  # noqa: F401
-except ImportError:
-    # Fallback for legacy/standalone use; mirrors the contract.py implementation.
-    RAW_LHAND_RANGE = (501, 522)
-    RAW_RHAND_RANGE = (522, 543)
-    PRE_LHAND_RANGE = (0, 21)
-    PRE_RHAND_RANGE = (21, 42)
+# --------------------------------------------------------------------------- helpers used by tf.data
 
-    def compute_motion_energy(buffer: np.ndarray, window: int = 30) -> float:  # type: ignore[no-redef]
-        if buffer.ndim != 3:
-            return 0.0
-        L = buffer.shape[1]
-        if L == 543:
-            lh = buffer[:, RAW_LHAND_RANGE[0]:RAW_LHAND_RANGE[1], :3]
-            rh = buffer[:, RAW_RHAND_RANGE[0]:RAW_RHAND_RANGE[1], :3]
-        elif L >= 42:
-            lh = buffer[:, PRE_LHAND_RANGE[0]:PRE_LHAND_RANGE[1], :3]
-            rh = buffer[:, PRE_RHAND_RANGE[0]:PRE_RHAND_RANGE[1], :3]
-        else:
-            return 0.0
-        hands = np.concatenate([lh, rh], axis=1)
-        if hands.shape[0] > window:
-            hands = hands[-window:]
-        if hands.shape[0] < 2:
-            return 0.0
-        diffs = hands[1:] - hands[:-1]
-        speeds = np.linalg.norm(diffs, axis=-1)
-        if speeds.size == 0 or not np.any(np.isfinite(speeds)):
-            return 0.0
-        return float(np.nanmean(speeds))
+def filter_nans_tf(x: tf.Tensor, ref_landmarks=None) -> tf.Tensor:
+    """Drop frames where every reference landmark is NaN.
 
-
-def make_preprocess_layer(max_len: int = 384, use_motion_deltas: bool = True,
-                          use_acceleration: bool = False):
-    """Factory for the TF-graph version of `preprocess_numpy`.
-
-    Returns a `tf.keras.layers.Layer` instance suitable for inclusion in a
-    SavedModel. We import TensorFlow lazily so callers that only need the
-    numpy path (offline cache extraction) don't pay the import cost.
-
-    Train/serve parity matters: `use_motion_deltas` AND `use_acceleration`
-    MUST match what `preprocess_numpy` was called with at cache-build time,
-    otherwise the live demo feeds the wrong number of channels into the
-    trained model.
+    Hoyso48 calls this before augmentation so resampling/cropping operate on
+    only meaningful frames. He uses POINT_LANDMARKS as the reference set,
+    matching the on-disk layout where MediaPipe failed-to-detect frames are
+    written as all-NaN.
     """
-    import tensorflow as tf
-
-    if use_acceleration and not use_motion_deltas:
-        raise ValueError("use_acceleration=True requires use_motion_deltas=True")
-
-    class Preprocess(tf.keras.layers.Layer):
-        def __init__(self, max_len: int = 384, use_motion_deltas: bool = True,
-                     use_acceleration: bool = False, **kwargs):
-            super().__init__(**kwargs)
-            self.max_len = max_len
-            self.use_motion_deltas = use_motion_deltas
-            self.use_acceleration = use_acceleration
-            self.selected_cols = tf.constant(lm.SELECTED_COLUMNS, dtype=tf.int32)
-            self.lhand_lo, self.lhand_hi = lm.LHAND_OFFSET, lm.LHAND_OFFSET + lm.N_HAND
-            self.rhand_lo, self.rhand_hi = lm.RHAND_OFFSET, lm.RHAND_OFFSET + lm.N_HAND
-
-        def call(self, holistic):
-            x = tf.cast(holistic, tf.float32)
-
-            lhand_nan = tf.reduce_all(tf.math.is_nan(x[:, self.lhand_lo:self.lhand_hi]), axis=[1, 2])
-            rhand_nan = tf.reduce_all(tf.math.is_nan(x[:, self.rhand_lo:self.rhand_hi]), axis=[1, 2])
-            keep = tf.logical_not(tf.logical_and(lhand_nan, rhand_nan))
-            x = tf.boolean_mask(x, keep)
-
-            n_left_nan = tf.reduce_sum(tf.cast(
-                tf.reduce_any(tf.math.is_nan(x[:, self.lhand_lo:self.lhand_hi]), axis=-1), tf.int32))
-            n_right_nan = tf.reduce_sum(tf.cast(
-                tf.reduce_any(tf.math.is_nan(x[:, self.rhand_lo:self.rhand_hi]), axis=-1), tf.int32))
-            flip = tf.less(n_left_nan, n_right_nan)
-
-            def _do_flip():
-                x_flipped = tf.concat([-x[..., :1], x[..., 1:]], axis=-1)
-                l = x_flipped[:, self.lhand_lo:self.lhand_hi]
-                r = x_flipped[:, self.rhand_lo:self.rhand_hi]
-                head = x_flipped[:, :self.lhand_lo]
-                return tf.concat([head, r, l], axis=1)
-
-            x = tf.cond(flip, _do_flip, lambda: x)
-            x = tf.gather(x, self.selected_cols, axis=1)
-
-            flat = tf.reshape(x, (-1, 3))
-            valid = tf.logical_not(tf.reduce_any(tf.math.is_nan(flat), axis=-1))
-            valid_vals = tf.boolean_mask(flat, valid)
-
-            def _stats():
-                mean = tf.reduce_mean(valid_vals, axis=0)
-                std = tf.math.reduce_std(valid_vals, axis=0)
-                std = tf.where(std < 1e-6, tf.ones_like(std), std)
-                return mean, std
-
-            def _fallback():
-                return (
-                    tf.constant([0.5, 0.5, 0.0], dtype=tf.float32),
-                    tf.constant([1.0, 1.0, 1.0], dtype=tf.float32),
-                )
-
-            mean, std = tf.cond(tf.size(valid_vals) > 0, _stats, _fallback)
-            x = (x - mean) / std
-            x = tf.where(tf.math.is_nan(x), tf.zeros_like(x), x)
-
-            t = tf.shape(x)[0]
-            feats, mask = tf.cond(
-                t >= self.max_len,
-                lambda: self._resize_down(x, t),
-                lambda: self._pad(x, t),
-            )
-            if self.use_motion_deltas:
-                deltas = feats[1:] - feats[:-1]
-                first = tf.zeros_like(feats[:1])
-                deltas = tf.concat([first, deltas], axis=0)
-                if self.use_acceleration:
-                    accel = deltas[1:] - deltas[:-1]
-                    accel = tf.concat([first, accel], axis=0)
-                    feats = tf.concat([feats, deltas, accel], axis=-1)
-                else:
-                    feats = tf.concat([feats, deltas], axis=-1)
-            return feats, mask
-
-        def _resize_down(self, x, t):
-            idx = tf.cast(tf.linspace(0.0, tf.cast(t - 1, tf.float32), self.max_len), tf.int32)
-            return tf.gather(x, idx, axis=0), tf.ones((self.max_len,), dtype=tf.bool)
-
-        def _pad(self, x, t):
-            pad = tf.zeros((self.max_len - t, 130, 3), dtype=tf.float32)
-            feats = tf.concat([x, pad], axis=0)
-            mask = tf.concat([tf.ones((t,), dtype=tf.bool), tf.zeros((self.max_len - t,), dtype=tf.bool)], axis=0)
-            return feats, mask
-
-        def get_config(self):
-            return {
-                **super().get_config(),
-                "max_len": self.max_len,
-                "use_motion_deltas": self.use_motion_deltas,
-                "use_acceleration": self.use_acceleration,
-            }
-
-    return Preprocess(max_len=max_len, use_motion_deltas=use_motion_deltas,
-                      use_acceleration=use_acceleration)
+    if ref_landmarks is None:
+        ref_landmarks = POINT_LANDMARKS
+    ref = tf.gather(x, ref_landmarks, axis=1)
+    keep = tf.math.logical_not(tf.reduce_all(tf.math.is_nan(ref), axis=[-2, -1]))
+    return tf.boolean_mask(x, keep, axis=0)
