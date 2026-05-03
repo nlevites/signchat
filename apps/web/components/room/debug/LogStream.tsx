@@ -46,7 +46,7 @@ export function LogStream() {
   }, [all, filterSource, minLevel]);
 
   return (
-    <div className="fixed right-0 bottom-0 left-0 z-30 border-t border-sc-border bg-sc-surface/95 backdrop-blur shadow-sc-md">
+    <div className="relative z-10 w-full border-t border-sc-border bg-sc-surface/95 backdrop-blur">
       <div className="flex flex-wrap items-center gap-2 px-4 py-2 t-body-sm">
         <button
           type="button"

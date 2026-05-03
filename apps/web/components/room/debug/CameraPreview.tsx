@@ -106,7 +106,14 @@ export function CameraPreview({
         POSE_LINE,
         POSE_LINE_WIDTH,
       );
-      drawLandmarks(ctx, frame.pose, mirror, w, h, POSE_DOT, 3);
+      // Skip pose indices 0-10 (head/face area) when drawing dots — the
+      // face mesh already conveys the head and dot-stippling on top of
+      // the mesh reads as visual noise.
+      for (let i = 11; i < frame.pose.length; i += 1) {
+        const lm = frame.pose[i];
+        if (!lm) continue;
+        drawDot(ctx, project(lm, mirror, w, h), 3, POSE_DOT);
+      }
     }
 
     // Face: oval + features (eyes, eyebrows, lips, irises). Skip tesselation
