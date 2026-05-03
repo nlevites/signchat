@@ -89,7 +89,7 @@ async function readAllRawRecords(runDir: string): Promise<RawRecord[]> {
 }
 
 async function walk(dir: string, handler: (file: string) => void): Promise<void> {
-  let entries: Awaited<ReturnType<typeof readdir>>;
+  let entries;
   try {
     entries = await readdir(dir, { withFileTypes: true });
   } catch {
@@ -273,7 +273,7 @@ function histogram(values: readonly number[], bins: number): { bins: number[]; c
   const counts = new Array<number>(bins).fill(0);
   for (const v of values) {
     const bucket = Math.min(bins - 1, Math.floor((v - min) / step));
-    counts[bucket] += 1;
+    counts[bucket] = (counts[bucket] ?? 0) + 1;
   }
   return { bins: edges, counts };
 }

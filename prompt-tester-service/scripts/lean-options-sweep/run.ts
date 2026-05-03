@@ -13,23 +13,22 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ALL_CASES } from "../../lib/fixtures.ts";
-import { getStrategy } from "../../lib/strategies.ts";
-import { composeUserPrompt } from "../../lib/compose.ts";
+import { ALL_CASES } from "../../lib/fixtures";
+import { getStrategy } from "../../lib/strategies";
+import { composeUserPrompt } from "../../lib/compose";
 import {
   computeCostUsd,
   parseReconstructionPayload,
   scoreResponse,
-} from "../../lib/scoring.ts";
+} from "../../lib/scoring";
 import type {
-  OpenRouterModel,
   PriceInfo,
   PromptTestCase,
   ReconstructionPayload,
   ScoreBreakdown,
-} from "../../lib/types.ts";
+} from "../../lib/types";
 
-import { summarizeRun } from "./summarize.ts";
+import { summarizeRun } from "./summarize";
 
 // ── Config ────────────────────────────────────────────────────────────────
 
