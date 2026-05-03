@@ -15,7 +15,7 @@ interface NavProps {
  * architecture / PRD — no invented "agent store" / "studio" entries.
  *  - Signchat Web      → / (the browser 1:1 video app)
  *  - Signchat Bridge   → forward-compatible Electron app (architecture §16)
- *  - ASL Classifier    → 250-class ONNX model (architecture §5.4)
+ *  - ASL Classifier    → custom ASL classifier ONNX model (architecture §5.4)
  *  - Sign Pipeline     → packages/sign-pipeline + prompts
  *  - Architecture      → public technical spec
  * Routes that don't exist yet 404 — that's intentional per spec. */

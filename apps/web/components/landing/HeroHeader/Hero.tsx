@@ -109,7 +109,7 @@ export function Hero({
         <GlassPanel slot="chat" index={0} ariaLabel="Live ASL classifier">
           <div className={s.chatHeader}>
             <HandWaving size={14} weight="regular" style={{ opacity: 0.7 }} />
-            <span>ASL classifier · 250-class · runs in browser</span>
+            <span>Custom ASL classifier · runs in browser</span>
           </div>
           <div className={s.chatBubble}>
             <span style={{ opacity: 0.7, fontSize: 12 }}>
@@ -161,7 +161,7 @@ export function Hero({
           <span className={s.pillIcon} aria-hidden>
             <Lightning size={12} weight="fill" />
           </span>
-          <span>Sign-end to first audible byte · 1.1 s p50</span>
+          <span>Sign-end to first audible byte · less than 1 s at P50</span>
         </GlassPanel>
 
         {/* slot 4 — review-before-broadcast UI (architecture §7, PRD §5.4

@@ -11,11 +11,11 @@ const BANNER_HREF = "/teams";
 const NAV_LINKS = ["Product", "Enterprise", "Education", "Pricing"] as const;
 /* H1 is rendered with a hard break after the comma to match the reference
  * (two lines, balanced). Hero.tsx splits on "," and inserts <br />. */
-const HEADLINE = "Conversation, without barriers";
+const HEADLINE = "Sign with your hands, they hear your voice";
 /* keep subhead short enough to land on a single line at ~26px so it
  * doesn't bleed under the chat / editor glass panels horizontally. */
 const SUBHEADLINE =
-  "Real-time signing and captions, in every meeting";
+  "Real-time ASL-to-voice and live captions. Free, in your browser, no install.";
 const CTA_LABEL = "Start a call";
 const CTA_HREF = "/start";
 const HERO_VIDEO = "/hero-header/hero-bg.mp4";
