@@ -118,6 +118,7 @@ export function Lobby({ roomId, displayName, role, onJoin, onCancel }: LobbyProp
       cancelled = true;
       stopStream();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // re-acquire on selection / enable changes. skip before the first successful
@@ -126,6 +127,7 @@ export function Lobby({ roomId, displayName, role, onJoin, onCancel }: LobbyProp
   useEffect(() => {
     if (!streamRef.current && !ready) return;
     void acquireStream(audioInputId, videoInputId, micEnabled, camEnabled);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [audioInputId, videoInputId, micEnabled, camEnabled]);
 
   // deaf-side: prewarm whisper + silero vad while the user picks devices, so

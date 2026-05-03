@@ -3,19 +3,39 @@
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import type { Role } from "@signchat/contracts";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type {
+  CaptureMode,
+  ParticipantInfo,
+  Role,
+} from "@signchat/contracts";
 import { Logo } from "@/components/ui/Logo";
+import { CaptureControls } from "@/components/room/CaptureControls";
 import { ChatPanel } from "@/components/room/ChatPanel";
 import { ControlBar } from "@/components/room/ControlBar";
 import { ConnectionBadge } from "@/components/room/ConnectionBadge";
+import { DeafSession } from "@/components/room/DeafSession";
+import { DebugView } from "@/components/room/DebugView";
 import { Lobby, type LobbyDeviceState } from "@/components/room/Lobby";
+import { TranscriptStrip } from "@/components/room/TranscriptStrip";
 import { VideoTile } from "@/components/room/VideoTile";
 import { ViewToggle, type ViewMode } from "@/components/room/ViewToggle";
+import { LogStream } from "@/components/room/debug/LogStream";
+import { useCredentialsStore } from "@/lib/credentials/store";
 import { useDevWindowHandle } from "@/lib/dev-window";
+import { mintElevenLabsSignedUrl } from "@/lib/livekit/mint-elevenlabs";
 import { mintLiveKitToken } from "@/lib/livekit/mint-token";
+import { mintOpenRouterSessionKey } from "@/lib/livekit/mint-openrouter";
 import { useLiveKitRoom } from "@/lib/livekit/room";
-import { useRoomStore } from "@/lib/stores";
+import {
+  ControllerStore,
+  useModeSnapshot,
+} from "@/lib/mode-controller/controller-store";
+import {
+  usePreferencesStore,
+  useRoomStore,
+  useTranscriptStore,
+} from "@/lib/stores";
 import { toast } from "@/lib/stores/toast";
 
 interface RoomClientProps {
@@ -53,6 +73,9 @@ export function RoomClient({ roomId }: RoomClientProps) {
   const setConnectionState = useRoomStore((s) => s.setConnectionState);
   const setLiveKitCredentials = useRoomStore((s) => s.setLiveKitCredentials);
   const clearLiveKitCredentials = useRoomStore((s) => s.clearLiveKitCredentials);
+  const setOpenRouter = useCredentialsStore((s) => s.setOpenRouter);
+  const setElevenLabs = useCredentialsStore((s) => s.setElevenLabs);
+  const clearCredentials = useCredentialsStore((s) => s.clear);
 
   useEffect(() => {
     setRoomId(roomId);
@@ -62,6 +85,7 @@ export function RoomClient({ roomId }: RoomClientProps) {
     return () => {
       setConnectionState("idle");
       clearLiveKitCredentials();
+      clearCredentials();
     };
   }, [
     roomId,
@@ -74,6 +98,7 @@ export function RoomClient({ roomId }: RoomClientProps) {
     setIdentity,
     setConnectionState,
     clearLiveKitCredentials,
+    clearCredentials,
   ]);
 
   if (!role) {
@@ -96,18 +121,47 @@ export function RoomClient({ roomId }: RoomClientProps) {
     setDevices(d);
     setConnectionState("connecting");
     try {
-      const creds = await mintLiveKitToken({ roomId, identity, name, role });
+      // LiveKit + (Deaf only) OpenRouter + ElevenLabs all mint in parallel
+      // so the join click → connected transition isn't serialized.
+      const [creds, sessionCreds] = await Promise.all([
+        mintLiveKitToken({ roomId, identity, name, role }),
+        role === "deaf"
+          ? Promise.all([
+              mintOpenRouterSessionKey({ roomId, identity, role: "deaf" }),
+              mintElevenLabsSignedUrl({ roomId, identity, role: "deaf" }),
+            ])
+          : Promise.resolve(null),
+      ]);
       setLiveKitCredentials({
         wsUrl: creds.wsUrl,
         token: creds.token,
         tokenExpiresAt: creds.tokenExpiresAt,
       });
+      if (sessionCreds) {
+        const [or, el] = sessionCreds;
+        setOpenRouter({
+          apiKey: or.apiKey,
+          modelId: or.modelId,
+          limitCredits: or.limitCredits,
+          keyHash: or.keyHash,
+          label: or.label,
+          createdAt: or.createdAt,
+        });
+        setElevenLabs({
+          signedUrl: el.signedUrl,
+          voiceId: el.voiceId,
+          modelId: el.modelId,
+          outputFormat: el.outputFormat,
+          expiresAt: el.expiresAt,
+        });
+      }
       setJoined(true);
     } catch (err) {
-      console.error("[room] token mint failed", err);
+      console.error("[room] credential mint failed", err);
       setConnectionState("disconnected");
       clearLiveKitCredentials();
-      toast.error("Could not get a room token — try again.");
+      clearCredentials();
+      toast.error("Could not get session credentials — try again.");
       throw err;
     }
   };
@@ -154,10 +208,18 @@ function ActiveRoom({
   const [chatOpen, setChatOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
+  const identity = useRoomStore((s) => s.identity);
+  const prefsMode = usePreferencesStore((s) => s.mode);
+  const setPrefsMode = usePreferencesStore((s) => s.setMode);
+  const prefsThresholds = usePreferencesStore((s) => s.thresholds);
+  const modeSnapshot = useModeSnapshot();
+
   const {
+    room,
     localVideoTrack,
     remoteVideoTrack,
     remoteAudioTrack,
+    remoteIdentity,
     remoteName,
     remoteRole,
     micEnabled,
@@ -180,6 +242,53 @@ function ActiveRoom({
     await leave();
     onLeave();
   };
+
+  const isDeaf = role === "deaf";
+
+  // Pull last 4 hearing-side transcript lines lazily so the DeafSession
+  // stitching effect doesn't re-fire on every transcript update.
+  const hearingTranscriptContext = useCallback((): string[] => {
+    const t = useTranscriptStore.getState();
+    const finals = t.messages
+      .filter(
+        (m) => m.kind === "transcript_final" || m.kind === "transcript_partial",
+      )
+      .slice(-4)
+      .map((m) => (m.kind === "transcript_final" || m.kind === "transcript_partial" ? m.text : ""))
+      .filter((s) => s.length > 0);
+    return finals;
+  }, []);
+
+  const participantInfo: ParticipantInfo = {
+    identity: identity ?? "(you)",
+    name: displayName,
+    role,
+  };
+
+  const onSetMode = useCallback(
+    (mode: CaptureMode) => {
+      setPrefsMode(mode);
+      ControllerStore.current()?.setMode(mode);
+    },
+    [setPrefsMode],
+  );
+
+  const onStartCapture = useCallback(() => {
+    ControllerStore.current()?.start();
+  }, []);
+  const onStopManual = useCallback(() => {
+    ControllerStore.current()?.stopManual();
+  }, []);
+  const onCancelCapture = useCallback(() => {
+    ControllerStore.current()?.cancel();
+  }, []);
+
+  const canStart =
+    isDeaf &&
+    modeSnapshot.state === "idle" &&
+    Boolean(localVideoTrack) &&
+    useCredentialsStore.getState().openrouter !== null &&
+    useCredentialsStore.getState().elevenlabs !== null;
 
   return (
     <main className="flex h-dvh flex-col overflow-hidden bg-sc-bg text-sc-text">
@@ -211,12 +320,28 @@ function ActiveRoom({
         <section className="relative flex min-w-0 flex-1 flex-col">
           <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden px-6 pt-6 pb-24">
             <div className="grid h-full max-h-full w-full max-w-[1200px] grid-cols-1 content-center gap-4 md:grid-cols-2">
-              <VideoTile
-                label={`${displayName} · you (${role})`}
-                role={role}
-                videoTrack={localVideoTrack}
-                mirrored
-              />
+              <div className="relative">
+                <VideoTile
+                  label={`${displayName} · you (${role})`}
+                  role={role}
+                  videoTrack={localVideoTrack}
+                  mirrored
+                  tileIdentity={identity ?? undefined}
+                  tileRole={role}
+                  showHearingPartials={role === "hearing"}
+                  showDeafCaption={role === "deaf"}
+                />
+                {isDeaf ? (
+                  <DeafSession
+                    room={room}
+                    localVideoTrack={localVideoTrack}
+                    remoteAudioTrack={remoteAudioTrack}
+                    participantInfo={participantInfo}
+                    hearingTranscriptContext={hearingTranscriptContext}
+                    publish={publish}
+                  />
+                ) : null}
+              </div>
               {remoteVideoTrack || remoteAudioTrack || remoteName ? (
                 <VideoTile
                   label={`${remoteName ?? "guest"}${remoteRole ? ` (${remoteRole})` : ""}`}
@@ -224,11 +349,32 @@ function ActiveRoom({
                   videoTrack={remoteVideoTrack}
                   audioTrack={remoteAudioTrack}
                   audioOutputDeviceId={devices.audioOutputDeviceId}
+                  tileIdentity={remoteIdentity ?? undefined}
+                  tileRole={remoteRole}
+                  showHearingPartials={remoteRole === "hearing"}
+                  showDeafCaption={remoteRole === "deaf"}
                 />
               ) : (
                 <VideoTile empty />
               )}
             </div>
+
+            {isDeaf ? (
+              <div className="absolute bottom-20 left-1/2 z-30 -translate-x-1/2">
+                <CaptureControls
+                  mode={prefsMode}
+                  state={modeSnapshot.state}
+                  buffer={modeSnapshot.buffer}
+                  silenceMs={prefsThresholds.silenceMs}
+                  enteredStateAt={modeSnapshot.enteredStateAt}
+                  canStart={canStart}
+                  onSetMode={onSetMode}
+                  onStart={onStartCapture}
+                  onStopManual={onStopManual}
+                  onCancel={onCancelCapture}
+                />
+              </div>
+            ) : null}
 
             <ControlBar
               micEnabled={micEnabled}
@@ -243,6 +389,8 @@ function ActiveRoom({
             />
           </div>
 
+          <TranscriptStrip />
+
           <AnimatePresence>
             {view === "debug" ? (
               <motion.div
@@ -253,15 +401,14 @@ function ActiveRoom({
                 transition={{ duration: 0.55, ease: [0.32, 0.72, 0, 1] }}
                 className="overflow-hidden border-t border-sc-border bg-sc-surface"
               >
-                <div className="max-h-[40vh] overflow-y-auto p-5">
-                  <p className="t-body-sm text-sc-text-2">
-                    Debug panel placeholder — model picker, latency markers,
-                    sign capture overlay land here once the pipeline is wired.
-                  </p>
+                <div className="max-h-[50vh] overflow-y-auto">
+                  <DebugView />
                 </div>
               </motion.div>
             ) : null}
           </AnimatePresence>
+
+          {view === "debug" ? <LogStream /> : null}
         </section>
 
         <motion.aside
@@ -271,7 +418,10 @@ function ActiveRoom({
           transition={{ duration: 0.52, ease: [0.32, 0.72, 0, 1] }}
         >
           <div className="absolute inset-y-0 right-0 flex w-[360px] flex-col">
-            <ChatPanel identity={displayName} />
+            <ChatPanel
+              participantInfo={participantInfo}
+              publish={publish}
+            />
           </div>
         </motion.aside>
       </div>

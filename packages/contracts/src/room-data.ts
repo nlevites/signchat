@@ -1,43 +1,52 @@
 import type { ParticipantInfo } from "./participant";
+import type { ReconstructionConfidence } from "./confidence";
+
+export interface ChatMessage {
+  v: 1;
+  kind: "chat";
+  id: string;
+  ts: number;
+  from: ParticipantInfo;
+  text: string;
+}
+
+export interface CaptionMessage {
+  v: 1;
+  kind: "caption";
+  id: string;
+  ts: number;
+  playAtMs: number;
+  from: ParticipantInfo;
+  sentence: string;
+  confidence: ReconstructionConfidence;
+  usedSigns: string[];
+  modelId: string;
+  latencyMs: number;
+}
+
+export interface TranscriptPartialMessage {
+  v: 1;
+  kind: "transcript_partial";
+  id: string;
+  ts: number;
+  from: ParticipantInfo;
+  text: string;
+}
+
+export interface TranscriptFinalMessage {
+  v: 1;
+  kind: "transcript_final";
+  id: string;
+  ts: number;
+  from: ParticipantInfo;
+  text: string;
+}
 
 export type RoomDataMessage =
-  | {
-      v: 1;
-      kind: "chat";
-      id: string;
-      ts: number;
-      from: ParticipantInfo;
-      text: string;
-    }
-  | {
-      v: 1;
-      kind: "caption";
-      id: string;
-      ts: number;
-      playAtMs: number;
-      from: ParticipantInfo;
-      sentence: string;
-      confidence: "high" | "medium" | "low";
-      usedSigns: string[];
-      modelId: string;
-      latencyMs: number;
-    }
-  | {
-      v: 1;
-      kind: "transcript_partial";
-      id: string;
-      ts: number;
-      from: ParticipantInfo;
-      text: string;
-    }
-  | {
-      v: 1;
-      kind: "transcript_final";
-      id: string;
-      ts: number;
-      from: ParticipantInfo;
-      text: string;
-    };
+  | ChatMessage
+  | CaptionMessage
+  | TranscriptPartialMessage
+  | TranscriptFinalMessage;
 
 export type RoomDataMessageKind = RoomDataMessage["kind"];
 
