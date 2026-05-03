@@ -1,0 +1,31 @@
+# Smoke config - the fastest possible end-to-end run.
+# Used for code debugging; should train in <30s on CPU.
+
+extends: base.yaml
+
+experiment:
+  name: smoke
+  notes: "MLP stub on tiny dataset; sanity-check the loop"
+
+data:
+  use_smoke: true
+  max_len: 64        # short to keep tensors small
+
+model:
+  name: mlp_stub
+  dim: 64
+  dropout: 0.0
+
+augment:
+  spatial_affine: { enabled: false }
+  time_resample:  { enabled: false }
+  temporal_mask:  { enabled: false }
+  finger_drop:    { enabled: false }
+
+train:
+  batch_size: 4
+  epochs: 5
+  lr: 1e-3
+  warmup_epochs: 0
+  schedule: constant
+  early_stop_patience: 100

@@ -1,0 +1,1 @@
+run_id,timestamp,config,model,vocab_size,train_acc,val_acc,val_signer_acc,latency_ms,n_params,notes

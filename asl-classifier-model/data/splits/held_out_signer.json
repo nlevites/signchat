@@ -1,0 +1,8 @@
+{
+  "_comment": "FROZEN split policy. Do NOT change mid-sprint. Any clip whose `signer_id` appears in `held_out_signers` is reserved for the final eval set and never enters training.",
+  "held_out_signers": [
+    "signer_eval"
+  ],
+  "val_fraction_within_train_signers": 0.15,
+  "random_seed": 42
+}
