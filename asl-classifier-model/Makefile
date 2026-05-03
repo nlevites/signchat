@@ -22,7 +22,7 @@ help:
 	@echo "                              Same extract on a CPU pod with a network volume"
 	@echo ""
 	@echo "TRAIN: hoyso48 1st-place port"
-	@echo "  make pretrain-phase1-kaggle Local train (300 epochs; needs Hopper-class GPU)"
+	@echo "  make pretrain-phase1-kaggle Local train (200 epochs; needs Hopper-class GPU)"
 	@echo "                              Optional: BATCH_SIZE=512 EPOCHS=300"
 	@echo "  make pod-train-phase1-kaggle VOLUME_ID=412s5n8qkh"
 	@echo "                              Full 300-epoch H200 train (~\$$16, ~4 hr)"

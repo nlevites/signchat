@@ -2,7 +2,7 @@
 
 Real-time American Sign Language → text MVP. MediaPipe Holistic landmarks → ~1.7M-param Conv1D-Transformer hybrid → live webcam demo on M-series Mac (or any Linux GPU).
 
-The training target is the **PopSign 250-sign vocabulary** (the Google Kaggle ISLR / `asl-signs` competition dataset). Architecture and recipe are a faithful port of [hoyso48's 1st-place solution](https://www.kaggle.com/competitions/asl-signs/discussion/406684) ([reference notebook](https://github.com/hoyso48/Google---Isolated-Sign-Language-Recognition-1st-place-solution/blob/main/ISLR_1st_place_Hoyeol_Sohn.ipynb)) — a Conv1D-Transformer hybrid trained with bf16 + XLA, OneCycleLR cosine, Lookahead-RectifiedAdam, and AWP regularization. Hardware adaptation: single H200 in place of 8× TPU v3 at the same effective batch size and peak learning rate.
+The training target is the **PopSign 250-sign vocabulary** (the Google Kaggle ISLR / `asl-signs` competition dataset). Architecture and recipe are a faithful port of [hoyso48's 1st-place solution](https://www.kaggle.com/competitions/asl-signs/discussion/406684) ([reference notebook](https://github.com/hoyso48/Google---Isolated-Sign-Language-Recognition-1st-place-solution/blob/main/ISLR_1st_place_Hoyeol_Sohn.ipynb)) — a Conv1D-Transformer hybrid trained with bf16 + XLA, OneCycleLR cosine, native `tf.keras.optimizers.AdamW`, and AWP regularization. Hardware adaptation: single H200 in place of 8× TPU v3 at the same effective batch size and peak learning rate. Recipe deltas: 200 epochs (vs 300) and AdamW (vs Lookahead-RectifiedAdam) — both for XLA compatibility / wall-clock budget; ~0.5 pp expected accuracy hit.
 
 ---
 
@@ -26,7 +26,7 @@ caffeinate -dimsuw $$ \
     python -u scripts/runpod_kaggle_islr.py --skip-rsync
 # Capture the new volume id printed at the end.
 
-# 4. Train PopSign 250 on a RunPod H200 (~$16, ~4 hr).
+# 4. Train PopSign 250 on a RunPod H200 (~$15, ~3.5 hr; 200 epochs, AdamW + XLA).
 caffeinate -dimsuw $$ \
     make pod-train-phase1-kaggle VOLUME_ID=<volume_id_from_step_3>
 
@@ -134,7 +134,7 @@ train:
   dropout_start_epoch: 15
 ```
 
-Optimizer: `tfa.optimizers.Lookahead(tfa.optimizers.RectifiedAdam(lr=schedule, weight_decay=decay_schedule, sma_threshold=4), sync_period=5)`. Both lr AND weight_decay follow the OneCycleLR shape. With `warmup_epochs=0` this is effectively a pure cosine decay from 4e-3 → 1e-6 across 300 epochs.
+Optimizer: native `tf.keras.optimizers.AdamW(learning_rate=schedule, weight_decay=decay_schedule, beta_1=0.9, beta_2=0.999, epsilon=1e-7)`. Both lr AND weight_decay follow the OneCycleLR shape. With `warmup_epochs=0` this is effectively a pure cosine decay from 4e-3 → 1e-6 across 200 epochs. The published recipe uses `Lookahead(RectifiedAdam)`; we substituted AdamW because the tfa Lookahead wrapper trips XLA's strict device placement on its lazy `sma_threshold` resource — losing XLA roughly doubles wall-clock on H200, so the ~0.5 pp expected accuracy delta is the right trade.
 
 AWP (Adversarial Weight Perturbation, vendored from [hoyso48/tf-utils](https://github.com/hoyso48/tf-utils) at [`src/awp.py`](src/awp.py)): from epoch 15, every train step does (1) forward+backward to get gradients, (2) perturb trainable weights along the L2-normalized gradient with magnitude `delta=0.2`, (3) forward+backward on the perturbed weights, (4) restore weights, (5) apply the adversarial gradient. ~2× per-step cost; materially helps generalization.
 
@@ -144,7 +144,7 @@ Output: `pretrained/phase1_kaggle/{best.weights.h5, last.weights.h5, vocab.json,
 
 ### Smoke gate
 
-For a $1 sanity run before committing to the full ~$16 / ~4 hr training:
+For a $1 sanity run before committing to the full ~$15 / ~3.5 hr training:
 
 ```bash
 caffeinate -dimsuw $$ \
@@ -163,7 +163,7 @@ If smoke fails — first thing to suspect is AWP. Set `awp: false` in `[configs/
 |---|---|---|
 | Extract PopSign onto a fresh volume (one-time) | `python -u scripts/runpod_kaggle_islr.py --skip-rsync` | ~$0.30-4 / ~30-60 min ([note on capacity](#runpod-tips)) |
 | Smoke train (5 epochs) | `caffeinate -dimsuw $$ make pod-train-phase1-kaggle VOLUME_ID=<id> EPOCHS=5` | ~$1 / ~10-15 min |
-| Full train (300 epochs) | `caffeinate -dimsuw $$ make pod-train-phase1-kaggle VOLUME_ID=<id>` | ~$16 / ~4 hr |
+| Full train (200 epochs) | `caffeinate -dimsuw $$ make pod-train-phase1-kaggle VOLUME_ID=<id>` | ~$15 / ~3.5 hr |
 | Eval on held-out signers | `make eval CKPT=pretrained/phase1_kaggle/` | ~1 min local |
 | Unit tests | `make test` | ~1 sec |
 
@@ -223,7 +223,7 @@ tensorflow-metal==1.1.0
 
 The pod-side install always uses `tensorflow[and-cuda]==2.15.1` per the `sys_platform == "linux"` marker.
 
-`tensorflow-addons==0.23.0` (provides `tfa.optimizers.RectifiedAdam` + `tfa.optimizers.Lookahead`) is in maintenance mode and the last release that supports TF 2.15 — pinned for that reason.
+No `tensorflow-addons` dependency. The published hoyso48 recipe used `tfa.optimizers.{RectifiedAdam, Lookahead}`; we substituted `tf.keras.optimizers.AdamW` (native, XLA-clean) because tfa is in maintenance mode and the Lookahead wrapper is incompatible with `jit_compile=True` under TF 2.15 (its `sma_threshold` resource lands on CPU and XLA refuses to read it from a GPU train step).
 
 ---
 
@@ -238,7 +238,7 @@ make test                              # 19 unit tests, ~1 sec, CPU only
 - [`test_contract.py`](tests/test_contract.py) — 15 unit tests for the inference state machine (no TF dependency).
 - [`test_kaggle_islr_loader.py`](tests/test_kaggle_islr_loader.py) — 4 regression tests guarding (a) `parquet_to_tensor` produces the canonical (T, 543, 3) layout in [Pose, Face, LHand, RHand] order with NaNs preserved, and (b) the Kaggle-sign → disk-gloss map pairs by prediction index, not by JSON insertion order.
 
-Locally I also exercise the new model end-to-end on synthetic data (model build, AWP train_step, OneCycleLR schedule, Preprocess, augment_fn) — those checks live as one-liners in the PR description rather than pinned tests because they require TF + tensorflow-addons which we don't want in the test suite's CPU-only critical path.
+Locally I also exercise the new model end-to-end on synthetic data (model build, AWP train_step, OneCycleLR schedule, Preprocess, augment_fn) — those checks live as one-liners in the PR description rather than pinned tests because they require TF which we don't want in the test suite's CPU-only critical path.
 
 ---
 

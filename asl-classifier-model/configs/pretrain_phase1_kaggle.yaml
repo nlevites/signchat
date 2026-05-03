@@ -3,15 +3,15 @@
 # Inherits the hoyso48 1st-place recipe from base.yaml. Overrides only the
 # experiment name and confirms the cache + splits paths.
 #
-# Cost: ~$16 on a RunPod H200 (~4 hr at 300 epochs). Override --epochs 5 for
-# a $1 smoke that validates the port end-to-end.
+# Cost: ~$15 on a RunPod H200 (~3.5 hr at 200 epochs, AdamW + XLA).
+# Override --epochs 5 for a $1 smoke that validates the port end-to-end.
 
 extends: base.yaml
 
 experiment:
   name: phase1_kaggle
   kind: pretrain                  # routes to pretrained/phase1_kaggle/
-  notes: "hoyso48 port: 250 PopSign signs, dim=192, 300 epochs, AWP+LateDropout"
+  notes: "hoyso48 port: 250 PopSign signs, dim=192, 200 epochs, AdamW+XLA, AWP+LateDropout"
 
 data:
   cache_dir:
