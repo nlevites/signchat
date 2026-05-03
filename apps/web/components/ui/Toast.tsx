@@ -14,7 +14,12 @@ import {
   useToastStore,
 } from "@/lib/stores/toast";
 
-const ERROR_AUTODISMISS_MS = 5000;
+const AUTODISMISS_MS: Record<ToastKind, number> = {
+  info: 2500,
+  warn: 4000,
+  error: 5000,
+  success: 2500,
+};
 
 interface KindStyles {
   container: string;
@@ -53,7 +58,7 @@ export function ToastContainer() {
     <div
       aria-live="polite"
       aria-atomic
-      className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex flex-col items-center gap-2 px-4"
+      className="pointer-events-none fixed inset-x-0 top-6 z-50 flex flex-col items-center gap-2 px-4"
     >
       <AnimatePresence initial={false}>
         {messages.map((m) => (
@@ -70,17 +75,19 @@ function ToastItem({ message }: { message: ToastMessage }) {
   const Icon = styles.icon;
 
   useEffect(() => {
-    if (message.kind !== "error") return;
-    const t = window.setTimeout(() => dismiss(message.id), ERROR_AUTODISMISS_MS);
+    const t = window.setTimeout(
+      () => dismiss(message.id),
+      AUTODISMISS_MS[message.kind],
+    );
     return () => window.clearTimeout(t);
   }, [message.id, message.kind, dismiss]);
 
   return (
     <motion.div
       role={message.kind === "error" ? "alert" : "status"}
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: -12 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 4 }}
+      exit={{ opacity: 0, y: -8 }}
       transition={{ duration: 0.2, ease: "easeOut" }}
       className={
         "pointer-events-auto inline-flex max-w-[440px] items-start gap-2 px-4 py-2.5 t-body-sm " +
