@@ -364,7 +364,9 @@
 .heroBg {
   position: absolute;
   inset: 0;
-  background: var(--sh-gradient-hero-dusk);
+  background:
+    url("/hero-header/hero-bg-poster.webp") center / cover no-repeat,
+    var(--sh-gradient-hero-dusk);
   z-index: 0;
   overflow: hidden;
 }

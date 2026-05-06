@@ -57,7 +57,14 @@ export function ContactPage() {
 
         <section className={s.hero}>
           <div className={s.heroBg} aria-hidden>
-            <video autoPlay muted loop playsInline preload="metadata">
+            <video
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              poster="/hero-header/hero-bg-poster.webp"
+            >
               <source src="/hero-header/hero-bg.mp4" type="video/mp4" />
             </video>
           </div>

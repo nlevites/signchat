@@ -19,6 +19,7 @@ const SUBHEADLINE =
 const CTA_LABEL = "Start a call";
 const CTA_HREF = "/start";
 const HERO_VIDEO = "/hero-header/hero-bg.mp4";
+const HERO_POSTER = "/hero-header/hero-bg-poster.webp";
 const HERO_SUBJECT = "/hero-header/hero-subject.webp";
 
 export function HeroHeader() {
@@ -44,6 +45,7 @@ export function HeroHeader() {
         ctaLabel={CTA_LABEL}
         ctaHref={CTA_HREF}
         videoSrc={HERO_VIDEO}
+        posterSrc={HERO_POSTER}
         subjectSrc={HERO_SUBJECT}
       />
     </div>

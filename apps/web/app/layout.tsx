@@ -18,6 +18,16 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={inter.variable}>
+      <head>
+        {/* small (~20 KB) still frame of the hero video so the dusk
+            scene paints instantly while the 4 MB mp4 streams in. */}
+        <link
+          rel="preload"
+          as="image"
+          href="/hero-header/hero-bg-poster.webp"
+          type="image/webp"
+        />
+      </head>
       <body className="antialiased">
         {children}
         <ToastContainer />
