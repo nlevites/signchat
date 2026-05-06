@@ -47,7 +47,7 @@ you talking.
 
 <div align="center">
 
-[![Watch the Signchat demo on YouTube](https://img.youtube.com/vi/SENhVVNZQGY/maxresdefault.jpg)](https://www.youtube.com/watch?v=SENhVVNZQGY)
+[![Signchat landing page](apps/web/public/brand/landing-screen.png)](https://signchat.org)
 
 **▶ [Watch the 3-minute demo on YouTube](https://www.youtube.com/watch?v=SENhVVNZQGY)**
 
