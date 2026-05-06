@@ -1,0 +1,174 @@
+.root          { composes: root          from "../BridgePage/bridge-page.module.css"; }
+.header        { composes: header        from "../BridgePage/bridge-page.module.css"; }
+.headerInner   { composes: headerInner   from "../BridgePage/bridge-page.module.css"; }
+.hero          { composes: hero          from "../BridgePage/bridge-page.module.css"; }
+.heroInner     { composes: heroInner     from "../BridgePage/bridge-page.module.css"; }
+.eyebrow       { composes: eyebrow       from "../BridgePage/bridge-page.module.css"; }
+.eyebrowDot    { composes: eyebrowDot    from "../BridgePage/bridge-page.module.css"; }
+.headline      { composes: headline      from "../BridgePage/bridge-page.module.css"; }
+.subheadline   { composes: subheadline   from "../BridgePage/bridge-page.module.css"; }
+.ctaRow        { composes: ctaRow        from "../BridgePage/bridge-page.module.css"; }
+.ctaPrimary    { composes: ctaPrimary    from "../BridgePage/bridge-page.module.css"; }
+.ctaSecondary  { composes: ctaSecondary  from "../BridgePage/bridge-page.module.css"; }
+.heroMeta      { composes: heroMeta      from "../BridgePage/bridge-page.module.css"; }
+.body          { composes: body          from "../BridgePage/bridge-page.module.css"; }
+.bodyInner     { composes: bodyInner     from "../BridgePage/bridge-page.module.css"; }
+.section       { composes: section       from "../BridgePage/bridge-page.module.css"; }
+.sectionHead   { composes: sectionHead   from "../BridgePage/bridge-page.module.css"; }
+.sectionEyebrow{ composes: sectionEyebrow from "../BridgePage/bridge-page.module.css"; }
+.sectionHeading{ composes: sectionHeading from "../BridgePage/bridge-page.module.css"; }
+.sectionLede   { composes: sectionLede   from "../BridgePage/bridge-page.module.css"; }
+.outro         { composes: outro         from "../BridgePage/bridge-page.module.css"; }
+.outroHeading  { composes: outroHeading  from "../BridgePage/bridge-page.module.css"; }
+.outroBody     { composes: outroBody     from "../BridgePage/bridge-page.module.css"; }
+.outroCta      { composes: outroCta      from "../BridgePage/bridge-page.module.css"; }
+
+.statStrip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.statCard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 22px 20px;
+  border: 1px solid #e3e3e2;
+  border-radius: 12px;
+  background: #ffffff;
+}
+.statValue {
+  font-family: var(--font-sans);
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.6px;
+  color: #292827;
+}
+.statLabel {
+  font-size: 12px;
+  color: #4a4558;
+  letter-spacing: 0.02em;
+}
+
+.flow {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 28px 32px;
+  border: 1px solid #e3e3e2;
+  border-radius: 12px;
+  background: #ffffff;
+}
+.flowParagraph {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.65;
+  color: #292827;
+}
+.flowParagraph code {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 13.5px;
+  background: #f4f0fc;
+  color: #714cb6;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.flowParagraph a { color: #714cb6; text-decoration: none; border-bottom: 1px solid currentColor; }
+.flowParagraph a:hover { opacity: 0.78; }
+
+.tocGrid {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.tocItem {
+  display: grid;
+  grid-template-columns: 48px 1fr 18px;
+  gap: 14px;
+  align-items: center;
+  padding: 16px 18px;
+  border: 1px solid #e3e3e2;
+  border-radius: 10px;
+  background: #ffffff;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 140ms ease, transform 140ms ease;
+}
+.tocItem:hover { border-color: #714cb6; transform: translateY(-1px); }
+.tocNumber {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #f4f0fc;
+  color: #714cb6;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 13px;
+  font-weight: 700;
+}
+.tocBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.tocTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #292827;
+  letter-spacing: -0.2px;
+}
+.tocBlurb {
+  font-size: 12.5px;
+  color: #7d7789;
+  line-height: 1.45;
+}
+.tocArrow { color: #cfc6d8; display: inline-flex; }
+
+.claimGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+.claimCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 24px;
+  border: 1px solid #e3e3e2;
+  border-radius: 12px;
+  background: #ffffff;
+}
+.claimIcon {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #d4c7ff;
+  color: #714cb6;
+}
+.claimTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.28px;
+  color: #292827;
+}
+.claimBody {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #4a4558;
+}
+.claimSource { margin-top: 4px; font-size: 12.5px; color: #7d7789; }
+.claimSource a { color: #714cb6; text-decoration: none; border-bottom: 1px solid currentColor; }
+
+@media (max-width: 920px) {
+  .statStrip, .tocGrid, .claimGrid { grid-template-columns: 1fr; }
+  .flow { padding: 22px; }
+}

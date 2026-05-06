@@ -1,0 +1,25 @@
+# local-only Vercel upload exclusions
+.git
+.cursor
+.DS_Store
+node_modules
+**/node_modules
+.pnpm-store
+.turbo
+.next
+**/.next
+**/*.tsbuildinfo
+**/*.log
+dist
+build
+release
+**/dist
+**/build
+**/release
+asl-classifier-model/data/cache
+asl-classifier-model/pretrained
+asl-classifier-model/.venv
+prompt-tester-service/node_modules
+prompt-tester-service/results
+signchat-workbench/node_modules
+signchat-workbench/.next
