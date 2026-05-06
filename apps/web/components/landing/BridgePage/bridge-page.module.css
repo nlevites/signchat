@@ -394,8 +394,10 @@
 
 /* ---- responsive ---------------------------------------------------- */
 @media (max-width: 768px) {
+  /* >= 36px horizontal so subpage content clears the 28px hatched rails
+   * painted by .sc-branded-frame on the body wrapper. */
   .hero {
-    padding: 131px 20px 80px;
+    padding: 131px 24px 80px;
   }
   .headline {
     font-size: 40px;
@@ -405,7 +407,7 @@
     font-size: 16px;
   }
   .body {
-    padding: 56px 20px 72px;
+    padding: 56px 36px 72px;
   }
   .bodyInner {
     gap: 48px;

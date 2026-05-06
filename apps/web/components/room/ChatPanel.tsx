@@ -1,6 +1,6 @@
 "use client";
 
-import { PaperPlaneTilt } from "@phosphor-icons/react/dist/ssr";
+import { PaperPlaneTilt, X } from "@phosphor-icons/react/dist/ssr";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   ChatMessage,
@@ -14,9 +14,10 @@ import { toast } from "@/lib/stores/toast";
 export interface ChatPanelProps {
   participantInfo: ParticipantInfo;
   publish: (msg: RoomDataMessage) => Promise<void>;
+  onClose?: () => void;
 }
 
-export function ChatPanel({ participantInfo, publish }: ChatPanelProps) {
+export function ChatPanel({ participantInfo, publish, onClose }: ChatPanelProps) {
   const messages = useTranscriptStore((s) => s.messages);
   const chatMessages = useMemo(
     () => messages.filter((m): m is ChatMessage => m.kind === "chat"),
@@ -76,11 +77,23 @@ export function ChatPanel({ participantInfo, publish }: ChatPanelProps) {
 
   return (
     <div className="flex h-full flex-col bg-sc-surface">
-      <header className="flex shrink-0 items-center justify-between border-b border-sc-divider px-4 py-3">
+      <header className="flex shrink-0 items-center justify-between gap-2 border-b border-sc-divider px-4 py-3">
         <span className="t-meta uppercase text-sc-text-3">Chat</span>
-        <span className="t-meta font-mono text-sc-text-3">
-          {chatMessages.length}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="t-meta font-mono text-sc-text-3">
+            {chatMessages.length}
+          </span>
+          {onClose ? (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close chat"
+              className="inline-flex size-7 items-center justify-center rounded-sc-full text-sc-text-2 transition-colors hover:bg-sc-surface-2 hover:text-sc-text"
+            >
+              <X size={14} weight="bold" />
+            </button>
+          ) : null}
+        </div>
       </header>
 
       <div

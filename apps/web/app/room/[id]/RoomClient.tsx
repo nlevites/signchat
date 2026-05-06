@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
@@ -318,10 +318,11 @@ function ActiveRoom({
     remoteName ||
     remoteIdentity
   );
-  /** main slot can only show the remote when the remote is actually here.
-   * if the user picked local-as-main they keep that even before the peer
-   * joins; once the peer joins, an empty remote tile is never shown big. */
-  const showLocalAsMain = mainTile === "local" || !remoteHasParticipant;
+  /** when no remote yet, the empty "waiting for participant" card lives in
+   * the main slot so the invite UI has room to read on mobile; the local
+   * preview drops to the PiP. once the remote joins, the user's mainTile
+   * preference (default: remote) drives which one fills the big slot. */
+  const showLocalAsMain = mainTile === "local" && remoteHasParticipant;
 
   /* the LiveLandmarkOverlay attaches to whichever tile holds the deaf
    * participant — local for the deaf user, remote for the hearing user
@@ -487,8 +488,9 @@ function ActiveRoom({
           {view === "debug" ? <LogStream /> : null}
         </section>
 
+        {/* desktop side panel: 360px aside that animates width 0 ↔ 360 */}
         <motion.aside
-          className="relative shrink-0 overflow-hidden border-l border-sc-border"
+          className="relative hidden shrink-0 overflow-hidden border-l border-sc-border md:block"
           initial={false}
           animate={{ width: chatOpen || settingsOpen ? 360 : 0 }}
           transition={{ duration: 0.52, ease: [0.32, 0.72, 0, 1] }}
@@ -512,6 +514,39 @@ function ActiveRoom({
           </div>
         </motion.aside>
       </div>
+
+      {/* mobile overlay: full-screen slide-in so the video tile underneath
+       * keeps the full viewport width when chat / settings are closed. */}
+      <AnimatePresence>
+        {chatOpen || settingsOpen ? (
+          <motion.div
+            className="fixed inset-0 z-40 flex flex-col bg-sc-surface md:hidden"
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
+            role="dialog"
+            aria-modal="true"
+          >
+            {settingsOpen ? (
+              <SettingsPanel
+                role={role}
+                onClose={() => setSettingsOpen(false)}
+                roomId={roomId}
+                view={view}
+                onChangeView={setView}
+                inviteUrl={inviteUrl}
+              />
+            ) : (
+              <ChatPanel
+                participantInfo={participantInfo}
+                publish={publish}
+                onClose={() => setChatOpen(false)}
+              />
+            )}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </main>
   );
 }

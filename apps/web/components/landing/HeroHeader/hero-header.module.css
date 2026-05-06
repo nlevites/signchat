@@ -888,22 +888,41 @@
 @media (max-width: 1199px) {
   .panels { transform: scale(0.86); transform-origin: top center; }
 }
+/* keep the desktop composition (subject as absolute backdrop, title
+ * overlaid in front) all the way down. anchor the subject to hero's
+ * bottom so its lower edge flushes with the next section — same as
+ * desktop where overflow:hidden clips it at hero bottom. titleGroup's
+ * padding-bottom controls how much the figure overlaps with the title. */
 @media (max-width: 1023px) {
   .panels { display: none; }
-  .heroSubject { top: 320px; height: 540px; }
-  .titleGroup { padding-top: 48px; }
+  .hero {
+    min-height: auto;
+    max-height: none;
+  }
+  .heroSubject {
+    top: auto;
+    bottom: 0;
+    width: min(640px, 100%);
+    height: auto;
+    aspect-ratio: 1152 / 860;
+  }
+  .titleGroup { padding-top: 32px; padding-bottom: 240px; }
 }
 @media (max-width: 768px) {
   .navLinks { display: none; }
   .headline { font-size: 44px; }
-  .subheadline { font-size: 20px; }
+  .subheadline { font-size: 18px; }
   .navRight > .navGhost:first-child { display: none; }
-  .banner { font-size: 13px; }
-  .heroSubject { height: 420px; }
+  .banner { font-size: 13px; gap: 10px; padding: 10px 12px; }
+  .heroSubject { width: min(480px, 92%); }
+  .titleGroup { padding-bottom: 220px; }
 }
 @media (max-width: 480px) {
   .navRight > .navGhost { display: none; }
   .headline { font-size: 36px; }
+  .subheadline { font-size: 16px; }
+  .heroSubject { width: min(400px, 88%); }
+  .titleGroup { padding-bottom: 200px; }
 }
 
 /* ---- integrations band (white section, boxed cell row) --------------
@@ -980,6 +999,9 @@
 }
 
 @media (max-width: 768px) {
+  .integrationsBand { padding: 28px 0; }
+  /* clear the 28px hatched rails painted by .sc-branded-frame on mobile. */
+  .integrationsInner { padding: 0 36px; }
   .integrationsLogos {
     height: auto;
     flex-wrap: wrap;

@@ -197,8 +197,17 @@
   .bigmarkWrap {
     margin-top: 48px;
   }
+  /* SIGNCHAT is 8 chars; at letter-spacing -0.045em + Inter 700, visible
+   * width is roughly 4.3 × font-size, so cap font-size near viewport/4.3
+   * to keep the whole word inside the footer instead of clipping. */
   .bigmark {
-    font-size: clamp(80px, 28vw, 240px);
+    font-size: clamp(48px, 19vw, 200px);
+  }
+}
+
+@media (max-width: 540px) {
+  .bigmark {
+    font-size: clamp(40px, 20vw, 140px);
   }
 }
 

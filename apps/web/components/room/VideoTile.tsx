@@ -252,8 +252,8 @@ export function VideoTile({
         <audio ref={audioRef} autoPlay className="hidden" />
       ) : null}
       {empty ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
-          <p className="t-h3 text-sc-text">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 py-3 text-center sm:gap-3 sm:p-6">
+          <p className="t-h3 break-words text-sc-text">
             {emptyText ?? "Waiting for the second participant…"}
           </p>
           <p className="t-body-sm text-sc-text-2">

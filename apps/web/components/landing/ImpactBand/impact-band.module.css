@@ -172,18 +172,25 @@
 }
 
 /* ---- responsive ---------------------------------------------------- */
+/* horizontal padding kept >= 32px so content clears the 28px hatched
+ * rails painted by .sc-branded-frame::before/::after. */
 @media (max-width: 768px) {
-  .impact { padding: 56px 20px 48px; }
+  .impact { padding: 56px 36px 48px; }
   .heading { font-size: 28px; letter-spacing: -0.62px; }
   .lede { font-size: 16px; }
   .stats { flex-direction: column; }
   .stats li {
+    flex: 0 0 auto;
+    align-items: flex-start;
+    text-align: left;
     border-right: 0;
     border-bottom: 1px solid #e3e3e2;
-    padding: 24px 20px;
+    padding: 18px 20px;
+    gap: 6px;
   }
   .stats li:last-child { border-bottom: 0; }
-  .statNumber { font-size: 36px; }
-  .statCaption { font-size: 16px; }
-  .punchline { font-size: 40px; letter-spacing: -0.92px; line-height: 1.2; }
+  .statNumber { font-size: 30px; letter-spacing: -0.6px; }
+  .statCaption { font-size: 14.5px; max-width: none; text-align: left; }
+  .statSource { margin-top: 4px; padding-top: 0; }
+  .punchline { font-size: 36px; letter-spacing: -0.85px; line-height: 1.2; }
 }
