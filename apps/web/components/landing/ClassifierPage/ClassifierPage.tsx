@@ -10,6 +10,7 @@ import {
   Stack,
 } from "@phosphor-icons/react/dist/ssr";
 import { Logo } from "@/components/ui/Logo";
+import { Reveal, RevealGroup } from "@/components/ui/Reveal";
 import { Footer } from "@/components/landing/Footer";
 import { Nav } from "@/components/landing/HeroHeader/Nav";
 import s from "./classifier-page.module.css";
@@ -19,7 +20,7 @@ const MODEL_DIR_URL = `${REPO_URL}/tree/main/asl-classifier-model`;
 const MODEL_README_URL = `${REPO_URL}/blob/main/asl-classifier-model/README.md`;
 const VOCAB_FILE_URL = `${REPO_URL}/blob/main/asl-classifier-model/data/vocab/kaggle_islr.json`;
 const ONNX_SESSION_URL = `${REPO_URL}/blob/main/packages/runtime-browser/src/sign-pipeline/onnx-session.ts`;
-const NAV_LINKS = ["Product", "Enterprise", "Education", "Pricing"] as const;
+const NAV_LINKS = ["Product", "Enterprise", "Education", "Pricing", "Contact"] as const;
 
 interface SpecCard { label: string; value: string; detail: string; }
 const SPECS: SpecCard[] = [
@@ -75,7 +76,12 @@ export function ClassifierPage() {
         </header>
 
         <section className={s.hero}>
-          <div className={s.heroInner}>
+          <div className={s.heroBg} aria-hidden>
+            <video autoPlay muted loop playsInline preload="metadata">
+              <source src="/hero-header/hero-bg.mp4" type="video/mp4" />
+            </video>
+          </div>
+          <RevealGroup className={s.heroInner}>
             <span className={s.eyebrow}>
               <span className={s.eyebrowDot} aria-hidden />
               ASL Classifier
@@ -101,14 +107,14 @@ export function ClassifierPage() {
               <span>200 epochs on a single H200</span>
               <span>WASM execution provider</span>
             </div>
-          </div>
+          </RevealGroup>
         </section>
       </div>
 
       <div className="sc-branded-frame">
         <section className={s.body}>
           <div className={s.bodyInner}>
-            <div className={s.section}>
+            <Reveal className={s.section}>
               <header className={s.sectionHead}>
                 <span className={s.sectionEyebrow}>What it is</span>
                 <h2 className={s.sectionHeading}>A small, fast, landmark-only classifier.</h2>
@@ -127,9 +133,9 @@ export function ClassifierPage() {
                   </div>
                 ))}
               </div>
-            </div>
+            </Reveal>
 
-            <div className={s.section}>
+            <Reveal className={s.section}>
               <header className={s.sectionHead}>
                 <span className={s.sectionEyebrow}>How it runs</span>
                 <h2 className={s.sectionHeading}>Loaded once, ticked every half-second.</h2>
@@ -151,9 +157,9 @@ export function ClassifierPage() {
                   </li>
                 ))}
               </ul>
-            </div>
+            </Reveal>
 
-            <div className={s.section}>
+            <Reveal className={s.section}>
               <header className={s.sectionHead}>
                 <span className={s.sectionEyebrow}>Inputs and outputs</span>
                 <h2 className={s.sectionHeading}>Landmarks in, ranked sign labels out.</h2>
@@ -183,9 +189,9 @@ export function ClassifierPage() {
                   </p>
                 </div>
               </div>
-            </div>
+            </Reveal>
 
-            <div className={s.section}>
+            <Reveal className={s.section}>
               <header className={s.sectionHead}>
                 <span className={s.sectionEyebrow}>Vocabulary</span>
                 <h2 className={s.sectionHeading}>250 signs from the PopSign corpus.</h2>
@@ -206,9 +212,9 @@ export function ClassifierPage() {
                   <a href={VOCAB_FILE_URL} target="_blank" rel="noreferrer">See all 250 →</a>
                 </div>
               </div>
-            </div>
+            </Reveal>
 
-            <div className={s.section}>
+            <Reveal className={s.section}>
               <header className={s.sectionHead}>
                 <span className={s.sectionEyebrow}>Trained on</span>
                 <h2 className={s.sectionHeading}>Google Kaggle <em>asl-signs</em> (PopSign 250).</h2>
@@ -220,9 +226,9 @@ export function ClassifierPage() {
                   performance on signers the model has never seen.
                 </p>
               </header>
-            </div>
+            </Reveal>
 
-            <div className={s.section}>
+            <Reveal className={s.section}>
               <header className={s.sectionHead}>
                 <span className={s.sectionEyebrow}>Open and reproducible</span>
                 <h2 className={s.sectionHeading}>Every recipe, script, and benchmark is in the repo.</h2>
@@ -240,9 +246,9 @@ export function ClassifierPage() {
                   </li>
                 ))}
               </ul>
-            </div>
+            </Reveal>
 
-            <div className={s.outro}>
+            <Reveal className={s.outro}>
               <span aria-hidden style={{ display: "inline-grid", placeItems: "center", width: 44, height: 44, borderRadius: 10, background: "#d4c7ff", color: "#714cb6" }}>
                 <HandWaving size={22} weight="regular" />
               </span>
@@ -260,7 +266,7 @@ export function ClassifierPage() {
                 <Books size={14} weight="regular" />
                 Or read the training README →
               </a>
-            </div>
+            </Reveal>
           </div>
         </section>
       </div>

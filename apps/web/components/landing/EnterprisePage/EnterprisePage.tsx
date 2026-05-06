@@ -10,15 +10,14 @@ import {
   UsersThree,
 } from "@phosphor-icons/react/dist/ssr";
 import { Logo } from "@/components/ui/Logo";
+import { Reveal, RevealGroup } from "@/components/ui/Reveal";
 import { Footer } from "@/components/landing/Footer";
 import { Nav } from "@/components/landing/HeroHeader/Nav";
 import s from "./enterprise-page.module.css";
 
 const REPO_URL = "https://github.com/nlevites/signchat";
-/* TODO: swap for the real Signchat enterprise inbox once provisioned. */
-const CONTACT_EMAIL = "hello@signchat.org";
-const CONTACT_HREF = `mailto:${CONTACT_EMAIL}?subject=Signchat%20for%20Teams%20pilot`;
-const NAV_LINKS = ["Product", "Enterprise", "Education", "Pricing"] as const;
+const CONTACT_HREF = "/contact";
+const NAV_LINKS = ["Product", "Enterprise", "Education", "Pricing", "Contact"] as const;
 
 interface Feature {
   icon: React.ReactNode;
@@ -68,7 +67,12 @@ export function EnterprisePage() {
         </header>
 
         <section className={s.hero}>
-          <div className={s.heroInner}>
+          <div className={s.heroBg} aria-hidden>
+            <video autoPlay muted loop playsInline preload="metadata">
+              <source src="/hero-header/hero-bg.mp4" type="video/mp4" />
+            </video>
+          </div>
+          <RevealGroup className={s.heroInner}>
             <span className={s.eyebrow}>
               <span className={s.eyebrowDot} aria-hidden />
               For organizations
@@ -108,14 +112,14 @@ export function EnterprisePage() {
                 <span className={s.proofCaption}>same code as the free app</span>
               </div>
             </div>
-          </div>
+          </RevealGroup>
         </section>
       </div>
 
       <div className="sc-branded-frame">
         <section className={s.body}>
           <div className={s.bodyInner}>
-            <div className={s.section}>
+            <Reveal className={s.section}>
               <header className={s.sectionHead}>
                 <span className={s.sectionEyebrow}>What you get</span>
                 <h2 className={s.sectionHeading}>The same browser-direct pipeline, made enterprise-ready.</h2>
@@ -134,9 +138,9 @@ export function EnterprisePage() {
                   </li>
                 ))}
               </ul>
-            </div>
+            </Reveal>
 
-            <div className={s.section}>
+            <Reveal className={s.section}>
               <header className={s.sectionHead}>
                 <span className={s.sectionEyebrow}>Built on what's already free</span>
                 <h2 className={s.sectionHeading}>Buy the relationship, not a different product.</h2>
@@ -166,13 +170,13 @@ export function EnterprisePage() {
                     contact, and a contractual SLA. Paid by the seat, billed annually.
                   </p>
                   <a className={s.builtOnLink} href={CONTACT_HREF}>
-                    Email the team <ArrowRight size={14} weight="bold" />
+                    Get in touch <ArrowRight size={14} weight="bold" />
                   </a>
                 </article>
               </div>
-            </div>
+            </Reveal>
 
-            <div className={s.section}>
+            <Reveal className={s.section}>
               <header className={s.sectionHead}>
                 <span className={s.sectionEyebrow}>Compliance &amp; privacy</span>
                 <h2 className={s.sectionHeading}>Zero-relay by architecture, not by promise.</h2>
@@ -203,9 +207,9 @@ export function EnterprisePage() {
                   </p>
                 </div>
               </div>
-            </div>
+            </Reveal>
 
-            <div className={s.outro}>
+            <Reveal className={s.outro}>
               <span aria-hidden style={{ display: "inline-grid", placeItems: "center", width: 44, height: 44, borderRadius: 10, background: "#d4c7ff", color: "#714cb6" }}>
                 <UsersThree size={22} weight="regular" />
               </span>
@@ -216,10 +220,10 @@ export function EnterprisePage() {
               </p>
               <a className={s.outroCta} href={CONTACT_HREF}>
                 <ChatsCircle size={18} weight="bold" />
-                Email {CONTACT_EMAIL}
+                Get in touch
                 <ArrowRight size={16} weight="bold" />
               </a>
-            </div>
+            </Reveal>
           </div>
         </section>
       </div>

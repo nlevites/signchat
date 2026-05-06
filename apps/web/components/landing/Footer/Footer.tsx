@@ -1,4 +1,4 @@
-import { GithubLogo } from "@phosphor-icons/react/dist/ssr";
+import { GithubLogo, LinkedinLogo } from "@phosphor-icons/react/dist/ssr";
 import { Logo } from "@/components/ui/Logo";
 import s from "./footer.module.css";
 
@@ -47,7 +47,30 @@ export function Footer() {
               Sign-language ↔ voice video chat that runs in your browser. No
               install, no backend, ~1-second end-to-end.
             </p>
-            <span className={s.brandMeta}>BeaverHacks 2026 · v0.1.0</span>
+            <span className={s.brandMeta}>v0.1.0</span>
+            <p className={s.credit}>
+              Built by{" "}
+              <a
+                className={s.creditLink}
+                href="https://www.linkedin.com/in/bazarkua/"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <LinkedinLogo size={14} weight="fill" aria-hidden />
+                Adil
+              </a>{" "}
+              and{" "}
+              <a
+                className={s.creditLink}
+                href="https://www.linkedin.com/in/nathan-levites/"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <LinkedinLogo size={14} weight="fill" aria-hidden />
+                Nathan
+              </a>
+              .
+            </p>
           </div>
 
           {COLUMNS.map((col) => (

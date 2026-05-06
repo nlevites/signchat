@@ -6,7 +6,6 @@
 
 **Real-time American Sign Language → voice video chat,<br/>running entirely in your browser, in about half a second.**
 
-[![BeaverHacks 2026](https://img.shields.io/badge/BeaverHacks-2026-714cb6?style=for-the-badge)](https://beaverhacks.devpost.com/)
 [![Live: signchat.org](https://img.shields.io/badge/live-signchat.org-3178c6?style=for-the-badge)](https://signchat.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-43853d?style=for-the-badge)](#license)
 
@@ -232,8 +231,7 @@ make eval CKPT=pretrained/phase1_kaggle/   # local CPU-only eval
 
 ## Team
 
-Built by **Adil & Nathan**<br/>
-for **BeaverHacks 2026 · Oregon State University**.
+Built by **Adil & Nathan**.
 
 </div>
 

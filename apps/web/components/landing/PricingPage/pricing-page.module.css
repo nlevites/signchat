@@ -2,6 +2,7 @@
 .header        { composes: header        from "../BridgePage/bridge-page.module.css"; }
 .headerInner   { composes: headerInner   from "../BridgePage/bridge-page.module.css"; }
 .hero          { composes: hero          from "../BridgePage/bridge-page.module.css"; }
+.heroBg        { composes: heroBg        from "../BridgePage/bridge-page.module.css"; }
 .heroInner     { composes: heroInner     from "../BridgePage/bridge-page.module.css"; }
 .eyebrow       { composes: eyebrow       from "../BridgePage/bridge-page.module.css"; }
 .eyebrowDot    { composes: eyebrowDot    from "../BridgePage/bridge-page.module.css"; }

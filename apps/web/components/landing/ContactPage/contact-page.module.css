@@ -10,7 +10,6 @@
 .subheadline   { composes: subheadline   from "../BridgePage/bridge-page.module.css"; }
 .ctaRow        { composes: ctaRow        from "../BridgePage/bridge-page.module.css"; }
 .ctaPrimary    { composes: ctaPrimary    from "../BridgePage/bridge-page.module.css"; }
-.ctaSecondary  { composes: ctaSecondary  from "../BridgePage/bridge-page.module.css"; }
 .heroMeta      { composes: heroMeta      from "../BridgePage/bridge-page.module.css"; }
 .body          { composes: body          from "../BridgePage/bridge-page.module.css"; }
 .bodyInner     { composes: bodyInner     from "../BridgePage/bridge-page.module.css"; }
@@ -24,154 +23,143 @@
 .outroBody     { composes: outroBody     from "../BridgePage/bridge-page.module.css"; }
 .outroCta      { composes: outroCta      from "../BridgePage/bridge-page.module.css"; }
 
-.programs {
+.people {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-}
-.programCard {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 28px 24px;
-  border: 1px solid #e3e3e2;
-  border-radius: 12px;
-  background: #ffffff;
-}
-.programIcon {
-  display: inline-grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: #d4c7ff;
-  color: #714cb6;
-}
-.programTitle {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: -0.32px;
-  color: #292827;
-}
-.programBody {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.55;
-  color: #4a4558;
-}
-.programAudience {
-  margin-top: auto;
-  padding-top: 12px;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #7d7789;
-  border-top: 1px solid #efeaf5;
-}
-
-.freeBand {
-  display: grid;
-  grid-template-columns: 60px 1fr auto;
+  grid-template-columns: 1fr 1fr;
   gap: 24px;
-  align-items: center;
-  padding: 28px 32px;
-  border: 1px solid #d4c7ff;
-  border-radius: 14px;
-  background:
-    radial-gradient(120% 140% at 0% 0%, rgba(212, 199, 255, 0.55) 0%, transparent 60%),
-    #ffffff;
 }
-.freeIcon {
-  display: inline-grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  background: #ffffff;
-  color: #714cb6;
-  border: 1px solid #d4c7ff;
-}
-.freeBody {
+.personCard {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-.freeTitle {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.36px;
-  color: #292827;
-}
-.freeText {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.55;
-  color: #4a4558;
-}
-.freeCta {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 42px;
-  padding: 0 18px;
-  background: #714cb6;
-  color: #ffffff;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 600;
-  text-decoration: none;
-  transition: background-color 160ms ease;
-}
-.freeCta:hover { background: #5d3aa1; }
-
-.integrationsRail {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-.integrationTile {
-  display: flex;
-  align-items: center;
   gap: 14px;
-  padding: 18px 20px;
+  padding: 28px;
   border: 1px solid #e3e3e2;
-  border-radius: 12px;
+  border-radius: 14px;
   background: #ffffff;
+  transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
 }
-.integrationLogo {
+.personCard:hover {
+  border-color: #c8b8f0;
+  box-shadow: 0 18px 38px rgba(20, 12, 50, 0.08);
+  transform: translateY(-2px);
+}
+.personAvatar {
   display: inline-grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  background: #faf8fd;
-  border: 1px solid #efeaf5;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.4px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    0 8px 18px rgba(40, 22, 90, 0.18);
 }
-.integrationLogo img {
-  width: 24px;
-  height: 24px;
-  object-fit: contain;
-}
-.integrationText {
+.personMeta {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-.integrationName {
-  font-size: 14px;
+.personName {
+  margin: 0;
+  font-size: 19px;
   font-weight: 600;
-  letter-spacing: -0.2px;
+  letter-spacing: -0.32px;
   color: #292827;
 }
-.integrationNote {
-  font-size: 12px;
-  color: #7d7789;
+.personRole {
+  font-size: 13px;
+  color: #714cb6;
+  letter-spacing: -0.05px;
+}
+.personBody {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: #4a4558;
+}
+.personCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  align-self: flex-start;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 10px;
+  background: #1a1130;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color 200ms ease, transform 200ms ease;
+}
+.personCta:hover {
+  background: #2a1c50;
+  transform: translateY(-1px);
+}
+
+.publicGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.publicCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 26px;
+  border: 1px solid #e3e3e2;
+  border-radius: 12px;
+  background: #ffffff;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
+}
+.publicCard:hover {
+  border-color: #c8b8f0;
+  box-shadow: 0 14px 32px rgba(20, 12, 50, 0.06);
+  transform: translateY(-1px);
+}
+.publicIcon {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #f4f0fc;
+  color: #714cb6;
+}
+.publicTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.28px;
+  color: #292827;
+}
+.publicBody {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #666666;
+}
+.publicLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #714cb6;
 }
 
 @media (max-width: 768px) {
-  .programs, .integrationsRail { grid-template-columns: 1fr; }
-  .freeBand { grid-template-columns: 1fr; text-align: center; justify-items: center; }
+  .people {
+    grid-template-columns: 1fr;
+  }
+  .publicGrid {
+    grid-template-columns: 1fr;
+  }
 }

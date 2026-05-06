@@ -9,13 +9,14 @@ import {
   Warning,
 } from "@phosphor-icons/react/dist/ssr";
 import { Logo } from "@/components/ui/Logo";
+import { Reveal, RevealGroup } from "@/components/ui/Reveal";
 import { Footer } from "@/components/landing/Footer";
 import { Nav } from "@/components/landing/HeroHeader/Nav";
 import s from "./architecture-page.module.css";
 
 const REPO_URL = "https://github.com/nlevites/signchat";
 const ARCH_URL = `${REPO_URL}/blob/main/ARCHITECTURE.md`;
-const NAV_LINKS = ["Product", "Enterprise", "Education", "Pricing"] as const;
+const NAV_LINKS = ["Product", "Enterprise", "Education", "Pricing", "Contact"] as const;
 
 interface Stat { value: string; label: string; }
 const STATS: Stat[] = [
@@ -70,7 +71,12 @@ export function ArchitecturePage() {
         </header>
 
         <section className={s.hero}>
-          <div className={s.heroInner}>
+          <div className={s.heroBg} aria-hidden>
+            <video autoPlay muted loop playsInline preload="metadata">
+              <source src="/hero-header/hero-bg.mp4" type="video/mp4" />
+            </video>
+          </div>
+          <RevealGroup className={s.heroInner}>
             <span className={s.eyebrow}>
               <span className={s.eyebrowDot} aria-hidden />
               Architecture
@@ -96,14 +102,14 @@ export function ArchitecturePage() {
               <span>3 mermaid diagrams</span>
               <span>Updated with the code</span>
             </div>
-          </div>
+          </RevealGroup>
         </section>
       </div>
 
       <div className="sc-branded-frame">
         <section className={s.body}>
           <div className={s.bodyInner}>
-            <div className={s.section}>
+            <Reveal className={s.section}>
               <header className={s.sectionHead}>
                 <span className={s.sectionEyebrow}>At a glance</span>
                 <h2 className={s.sectionHeading}>The numbers that matter.</h2>
@@ -116,9 +122,9 @@ export function ArchitecturePage() {
                   </div>
                 ))}
               </div>
-            </div>
+            </Reveal>
 
-            <div className={s.section}>
+            <Reveal className={s.section}>
               <header className={s.sectionHead}>
                 <span className={s.sectionEyebrow}>The data flow</span>
                 <h2 className={s.sectionHeading}>Two browsers, three providers, one Vercel mint route.</h2>
@@ -156,9 +162,9 @@ export function ArchitecturePage() {
                   Vercel is not on the per-turn data path.
                 </p>
               </div>
-            </div>
+            </Reveal>
 
-            <div className={s.section}>
+            <Reveal className={s.section}>
               <header className={s.sectionHead}>
                 <span className={s.sectionEyebrow}>Section index</span>
                 <h2 className={s.sectionHeading}>Jump straight into the doc.</h2>
@@ -181,9 +187,9 @@ export function ArchitecturePage() {
                   </li>
                 ))}
               </ol>
-            </div>
+            </Reveal>
 
-            <div className={s.section}>
+            <Reveal className={s.section}>
               <header className={s.sectionHead}>
                 <span className={s.sectionEyebrow}>Key claims</span>
                 <h2 className={s.sectionHeading}>Four things the architecture is willing to commit to.</h2>
@@ -202,9 +208,9 @@ export function ArchitecturePage() {
                   </article>
                 ))}
               </div>
-            </div>
+            </Reveal>
 
-            <div className={s.outro}>
+            <Reveal className={s.outro}>
               <span aria-hidden style={{ display: "inline-grid", placeItems: "center", width: 44, height: 44, borderRadius: 10, background: "#d4c7ff", color: "#714cb6" }}>
                 <GithubLogo size={22} weight="fill" />
               </span>
@@ -219,7 +225,7 @@ export function ArchitecturePage() {
                 Open ARCHITECTURE.md
                 <ArrowRight size={16} weight="bold" />
               </a>
-            </div>
+            </Reveal>
           </div>
         </section>
       </div>

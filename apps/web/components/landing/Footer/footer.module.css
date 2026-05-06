@@ -79,6 +79,32 @@
   text-transform: uppercase;
   color: rgba(248, 249, 252, 0.42);
 }
+.credit {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(248, 249, 252, 0.6);
+  margin: 0;
+}
+.creditLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: rgba(248, 249, 252, 0.92);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(248, 249, 252, 0.18);
+  padding-bottom: 1px;
+  transition: color var(--sc-dur-micro) ease, border-color var(--sc-dur-micro) ease;
+}
+.creditLink:hover {
+  color: #ffffff;
+  border-color: rgba(248, 249, 252, 0.55);
+}
+.creditLink:focus-visible {
+  outline: 2px solid var(--sc-accent-300);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
 
 .col {
   display: flex;

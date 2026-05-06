@@ -59,10 +59,12 @@
       #e8e2ef 97%, var(--sc-bg) 100%
     );
 
-  /* ---- banner — midnight plum + soft violet bloom (white type + Logo overlay). ---- */
+  /* ---- banner — indigo→violet pill with a soft top sheen so it harmonises
+     with the dusk-violet hero video behind it (white type + Logo overlay). ---- */
   --sc-banner-gradient:
-    radial-gradient(80% 60% at 50% 0%, rgba(176, 146, 238, 0.11) 0%, rgba(0, 0, 0, 0) 60%),
-    linear-gradient(180deg, var(--sc-hero-deep) 0%, #0c0818 58%, #06040f 100%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0) 38%),
+    radial-gradient(120% 140% at 50% -20%, rgba(212, 199, 255, 0.18) 0%, rgba(212, 199, 255, 0) 55%),
+    linear-gradient(95deg, #1f1545 0%, #3a2680 32%, #5a3aa8 52%, #3a2680 72%, #1f1545 100%);
 
   /* ---- footer — dark violet radial atmosphere (center glow → midnight edges).
    * white copy + Logo overlay. animation lives in footer.module.css ::before. ---- */

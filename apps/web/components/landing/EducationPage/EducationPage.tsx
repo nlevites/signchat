@@ -8,15 +8,14 @@ import {
   Student,
 } from "@phosphor-icons/react/dist/ssr";
 import { Logo } from "@/components/ui/Logo";
+import { Reveal, RevealGroup } from "@/components/ui/Reveal";
 import { Footer } from "@/components/landing/Footer";
 import { Nav } from "@/components/landing/HeroHeader/Nav";
 import s from "./education-page.module.css";
 
 const REPO_URL = "https://github.com/nlevites/signchat";
-/* TODO: swap for the real Signchat education inbox once provisioned. */
-const CONTACT_EMAIL = "schools@signchat.org";
-const CONTACT_HREF = `mailto:${CONTACT_EMAIL}?subject=Signchat%20for%20schools`;
-const NAV_LINKS = ["Product", "Enterprise", "Education", "Pricing"] as const;
+const CONTACT_HREF = "/contact";
+const NAV_LINKS = ["Product", "Enterprise", "Education", "Pricing", "Contact"] as const;
 
 interface Program {
   icon: React.ReactNode;
@@ -69,7 +68,12 @@ export function EducationPage() {
         </header>
 
         <section className={s.hero}>
-          <div className={s.heroInner}>
+          <div className={s.heroBg} aria-hidden>
+            <video autoPlay muted loop playsInline preload="metadata">
+              <source src="/hero-header/hero-bg.mp4" type="video/mp4" />
+            </video>
+          </div>
+          <RevealGroup className={s.heroInner}>
             <span className={s.eyebrow}>
               <span className={s.eyebrowDot} aria-hidden />
               For educators
@@ -95,14 +99,14 @@ export function EducationPage() {
               <span>No installs, no accounts</span>
               <span>Open source</span>
             </div>
-          </div>
+          </RevealGroup>
         </section>
       </div>
 
       <div className="sc-branded-frame">
         <section className={s.body}>
           <div className={s.bodyInner}>
-            <div className={s.section}>
+            <Reveal className={s.section}>
               <header className={s.sectionHead}>
                 <span className={s.sectionEyebrow}>Programs we support</span>
                 <h2 className={s.sectionHeading}>From kindergarten to graduate seminars.</h2>
@@ -122,9 +126,9 @@ export function EducationPage() {
                   </article>
                 ))}
               </div>
-            </div>
+            </Reveal>
 
-            <div className={s.section}>
+            <Reveal className={s.section}>
               <header className={s.sectionHead}>
                 <span className={s.sectionEyebrow}>Free for schools</span>
                 <h2 className={s.sectionHeading}>Always free for accredited schools and 501(c)(3) non-profits.</h2>
@@ -139,19 +143,19 @@ export function EducationPage() {
                   <Heart size={24} weight="regular" />
                 </span>
                 <div className={s.freeBody}>
-                  <h3 className={s.freeTitle}>Email us your .edu address</h3>
+                  <h3 className={s.freeTitle}>Send us your .edu details</h3>
                   <p className={s.freeText}>
-                    We'll send you a one-page rollout guide, a sample lesson plan from Deaf-studies
-                    instructors, and a direct line to a human if anything sticks.
+                    Drop a message on LinkedIn and we'll send a one-page rollout guide, a sample
+                    lesson plan from Deaf-studies instructors, and a direct line if anything sticks.
                   </p>
                 </div>
                 <a className={s.freeCta} href={CONTACT_HREF}>
                   Get the educator pack <ArrowRight size={14} weight="bold" />
                 </a>
               </div>
-            </div>
+            </Reveal>
 
-            <div className={s.section}>
+            <Reveal className={s.section}>
               <header className={s.sectionHead}>
                 <span className={s.sectionEyebrow}>Classroom integrations</span>
                 <h2 className={s.sectionHeading}>Drops into the meeting tools your school already pays for.</h2>
@@ -177,9 +181,9 @@ export function EducationPage() {
                   </div>
                 ))}
               </div>
-            </div>
+            </Reveal>
 
-            <div className={s.outro}>
+            <Reveal className={s.outro}>
               <span aria-hidden style={{ display: "inline-grid", placeItems: "center", width: 44, height: 44, borderRadius: 10, background: "#d4c7ff", color: "#714cb6" }}>
                 <ChalkboardTeacher size={22} weight="regular" />
               </span>
@@ -190,13 +194,13 @@ export function EducationPage() {
               </p>
               <a className={s.outroCta} href={CONTACT_HREF}>
                 <ChatsCircle size={18} weight="bold" />
-                Email {CONTACT_EMAIL}
+                Get in touch
                 <ArrowRight size={16} weight="bold" />
               </a>
               <a href={REPO_URL} target="_blank" rel="noreferrer" style={{ marginTop: 4, fontSize: 13, color: "#7d7789", textDecoration: "none" }}>
                 Or fork the code on GitHub →
               </a>
-            </div>
+            </Reveal>
           </div>
         </section>
       </div>

@@ -6,6 +6,7 @@ import {
   PaperPlaneTilt,
 } from "@phosphor-icons/react/dist/ssr";
 import { Logo } from "@/components/ui/Logo";
+import { Reveal, RevealGroup } from "@/components/ui/Reveal";
 import { Footer } from "@/components/landing/Footer";
 import { Nav } from "@/components/landing/HeroHeader/Nav";
 import s from "./pipeline-page.module.css";
@@ -14,7 +15,7 @@ const REPO_URL = "https://github.com/nlevites/signchat";
 const BLOB = `${REPO_URL}/blob/main`;
 const PACKAGES_URL = `${REPO_URL}/tree/main/packages`;
 const ARCH_URL = `${BLOB}/ARCHITECTURE.md`;
-const NAV_LINKS = ["Product", "Enterprise", "Education", "Pricing"] as const;
+const NAV_LINKS = ["Product", "Enterprise", "Education", "Pricing", "Contact"] as const;
 
 interface CodeRef { label: string; path?: string; }
 interface Stage { title: string; desc: React.ReactNode; refs: CodeRef[]; }
@@ -107,7 +108,12 @@ export function PipelinePage() {
         </header>
 
         <section className={s.hero}>
-          <div className={s.heroInner}>
+          <div className={s.heroBg} aria-hidden>
+            <video autoPlay muted loop playsInline preload="metadata">
+              <source src="/hero-header/hero-bg.mp4" type="video/mp4" />
+            </video>
+          </div>
+          <RevealGroup className={s.heroInner}>
             <span className={s.eyebrow}>
               <span className={s.eyebrowDot} aria-hidden />
               Sign Pipeline
@@ -134,14 +140,14 @@ export function PipelinePage() {
               <span>7 stages</span>
               <span>0 relays</span>
             </div>
-          </div>
+          </RevealGroup>
         </section>
       </div>
 
       <div className="sc-branded-frame">
         <section className={s.body}>
           <div className={s.bodyInner}>
-            <div className={s.section}>
+            <Reveal className={s.section}>
               <header className={s.sectionHead}>
                 <span className={s.sectionEyebrow}>The seven stages</span>
                 <h2 className={s.sectionHeading}>How a sign becomes a sentence becomes a voice.</h2>
@@ -173,9 +179,9 @@ export function PipelinePage() {
                   </li>
                 ))}
               </ol>
-            </div>
+            </Reveal>
 
-            <div className={s.section}>
+            <Reveal className={s.section}>
               <header className={s.sectionHead}>
                 <span className={s.sectionEyebrow}>Where each stage lives</span>
                 <h2 className={s.sectionHeading}>Three packages, one product.</h2>
@@ -195,9 +201,9 @@ export function PipelinePage() {
                   </article>
                 ))}
               </div>
-            </div>
+            </Reveal>
 
-            <div className={s.section}>
+            <Reveal className={s.section}>
               <header className={s.sectionHead}>
                 <span className={s.sectionEyebrow}>Browser-direct, by design</span>
                 <h2 className={s.sectionHeading}>No relay, no WSS gateway, no server-side TTS.</h2>
@@ -214,9 +220,9 @@ export function PipelinePage() {
                   <span className={s.badge}><Broadcast size={11} weight="bold" /> No server-side TTS</span>
                 </div>
               </div>
-            </div>
+            </Reveal>
 
-            <div className={s.section}>
+            <Reveal className={s.section}>
               <header className={s.sectionHead}>
                 <span className={s.sectionEyebrow}>Measured latency</span>
                 <h2 className={s.sectionHeading}>Reconstruction latency, by model.</h2>
@@ -247,9 +253,9 @@ export function PipelinePage() {
                   RESULTS.md
                 </a>.
               </p>
-            </div>
+            </Reveal>
 
-            <div className={s.outro}>
+            <Reveal className={s.outro}>
               <span aria-hidden style={{ display: "inline-grid", placeItems: "center", width: 44, height: 44, borderRadius: 10, background: "#d4c7ff", color: "#714cb6" }}>
                 <Lightning size={22} weight="fill" />
               </span>
@@ -267,7 +273,7 @@ export function PipelinePage() {
                 <GithubLogo size={14} weight="fill" />
                 Or browse the packages →
               </a>
-            </div>
+            </Reveal>
           </div>
         </section>
       </div>

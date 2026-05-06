@@ -7,8 +7,8 @@ import s from "./hero-header.module.css";
 /* ---- copy + asset constants — edit here, not in JSX ----------------- */
 const BANNER_TEXT = "Looking for Signchat for Teams?";
 const BANNER_CTA = "Learn more";
-const BANNER_HREF = "/teams";
-const NAV_LINKS = ["Product", "Enterprise", "Education", "Pricing"] as const;
+const BANNER_HREF = "/enterprise";
+const NAV_LINKS = ["Product", "Enterprise", "Education", "Pricing", "Contact"] as const;
 /* H1 is rendered with a hard break after the comma to match the reference
  * (two lines, balanced). Hero.tsx splits on "," and inserts <br />. */
 const HEADLINE = "Sign with your hands, they hear your voice";

@@ -3,6 +3,7 @@ declare const styles: {
   readonly headerInner: string;
   readonly header: string;
   readonly hero: string;
+  readonly heroBg: string;
   readonly heroInner: string;
   readonly eyebrow: string;
   readonly eyebrowDot: string;

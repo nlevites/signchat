@@ -8,6 +8,7 @@ import {
   ShieldCheck,
 } from "@phosphor-icons/react/dist/ssr";
 import { Logo } from "@/components/ui/Logo";
+import { Reveal, RevealGroup } from "@/components/ui/Reveal";
 import { Footer } from "@/components/landing/Footer";
 import { Nav } from "@/components/landing/HeroHeader/Nav";
 import s from "./bridge-page.module.css";
@@ -15,7 +16,7 @@ import s from "./bridge-page.module.css";
 const RELEASES_URL = "https://github.com/nlevites/signchat/releases";
 const REPO_URL = "https://github.com/nlevites/signchat";
 const BLACKHOLE_URL = "https://existential.audio/blackhole/";
-const NAV_LINKS = ["Product", "Enterprise", "Education", "Pricing"] as const;
+const NAV_LINKS = ["Product", "Enterprise", "Education", "Pricing", "Contact"] as const;
 
 interface Feature {
   icon: React.ReactNode;
@@ -114,7 +115,12 @@ export function BridgePage() {
         </header>
 
         <section className={s.hero}>
-          <div className={s.heroInner}>
+          <div className={s.heroBg} aria-hidden>
+            <video autoPlay muted loop playsInline preload="metadata">
+              <source src="/hero-header/hero-bg.mp4" type="video/mp4" />
+            </video>
+          </div>
+          <RevealGroup className={s.heroInner}>
             <span className={s.eyebrow}>
               <span className={s.eyebrowDot} aria-hidden />
               Available now · macOS
@@ -152,14 +158,14 @@ export function BridgePage() {
               <span>Notarised DMG</span>
               <span>Same OpenRouter + ElevenLabs path as web</span>
             </div>
-          </div>
+          </RevealGroup>
         </section>
       </div>
 
       <div className="sc-branded-frame">
         <section className={s.body}>
           <div className={s.bodyInner}>
-            <div className={s.section}>
+            <Reveal className={s.section}>
               <header className={s.sectionHead}>
                 <span className={s.sectionEyebrow}>What it is</span>
                 <h2 className={s.sectionHeading}>
@@ -194,9 +200,9 @@ export function BridgePage() {
                   </li>
                 ))}
               </ul>
-            </div>
+            </Reveal>
 
-            <div className={s.section}>
+            <Reveal className={s.section}>
               <header className={s.sectionHead}>
                 <span className={s.sectionEyebrow}>What you need</span>
                 <h2 className={s.sectionHeading}>
@@ -221,9 +227,9 @@ export function BridgePage() {
                   </li>
                 ))}
               </ol>
-            </div>
+            </Reveal>
 
-            <div className={s.outro}>
+            <Reveal className={s.outro}>
               <span
                 aria-hidden
                 style={{
@@ -255,7 +261,7 @@ export function BridgePage() {
                 Download Bridge
                 <ArrowRight size={16} weight="bold" />
               </a>
-            </div>
+            </Reveal>
           </div>
         </section>
       </div>

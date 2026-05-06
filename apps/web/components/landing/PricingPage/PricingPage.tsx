@@ -11,12 +11,13 @@ import {
   Sparkle,
 } from "@phosphor-icons/react/dist/ssr";
 import { Logo } from "@/components/ui/Logo";
+import { Reveal, RevealGroup } from "@/components/ui/Reveal";
 import { Footer } from "@/components/landing/Footer";
 import { Nav } from "@/components/landing/HeroHeader/Nav";
 import s from "./pricing-page.module.css";
 
 const REPO_URL = "https://github.com/nlevites/signchat";
-const NAV_LINKS = ["Product", "Enterprise", "Education", "Pricing"] as const;
+const NAV_LINKS = ["Product", "Enterprise", "Education", "Pricing", "Contact"] as const;
 
 interface FaqItem {
   q: string;
@@ -61,7 +62,12 @@ export function PricingPage() {
         </header>
 
         <section className={s.hero}>
-          <div className={s.heroInner}>
+          <div className={s.heroBg} aria-hidden>
+            <video autoPlay muted loop playsInline preload="metadata">
+              <source src="/hero-header/hero-bg.mp4" type="video/mp4" />
+            </video>
+          </div>
+          <RevealGroup className={s.heroInner}>
             <span className={s.eyebrow}>
               <span className={s.eyebrowDot} aria-hidden />
               Pricing
@@ -71,14 +77,14 @@ export function PricingPage() {
               Signchat is open source and runs entirely in your browser. Use it for a video call
               with a friend, a class group project, or a company all-hands — same code, same price.
             </p>
-          </div>
+          </RevealGroup>
         </section>
       </div>
 
       <div className="sc-branded-frame">
         <section className={s.body}>
           <div className={s.bodyInner}>
-            <div className={s.section}>
+            <Reveal className={s.section}>
               <header className={s.sectionHead}>
                 <span className={s.sectionEyebrow}>Two ways to use it</span>
                 <h2 className={s.sectionHeading}>Free forever, with an enterprise option when you need one.</h2>
@@ -166,9 +172,9 @@ export function PricingPage() {
                   </div>
                 </article>
               </div>
-            </div>
+            </Reveal>
 
-            <div className={s.section}>
+            <Reveal className={s.section}>
               <header className={s.sectionHead}>
                 <span className={s.sectionEyebrow}>What "free" actually means</span>
                 <h2 className={s.sectionHeading}>No fine print, no $0-then-paywall.</h2>
@@ -201,9 +207,9 @@ export function PricingPage() {
                   </p>
                 </div>
               </div>
-            </div>
+            </Reveal>
 
-            <div className={s.section}>
+            <Reveal className={s.section}>
               <header className={s.sectionHead}>
                 <span className={s.sectionEyebrow}>FAQ</span>
                 <h2 className={s.sectionHeading}>Things people usually ask before their first call.</h2>
@@ -223,9 +229,9 @@ export function PricingPage() {
                   </li>
                 ))}
               </ul>
-            </div>
+            </Reveal>
 
-            <div className={s.outro}>
+            <Reveal className={s.outro}>
               <span aria-hidden style={{ display: "inline-grid", placeItems: "center", width: 44, height: 44, borderRadius: 10, background: "#d4c7ff", color: "#714cb6" }}>
                 <PaperPlaneTilt size={22} weight="regular" />
               </span>
@@ -239,7 +245,7 @@ export function PricingPage() {
                 Start a call
                 <ArrowRight size={16} weight="bold" />
               </a>
-            </div>
+            </Reveal>
           </div>
         </section>
       </div>
