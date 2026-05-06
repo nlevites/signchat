@@ -86,125 +86,131 @@ export function StartForm() {
       className="flex min-h-0 flex-1 flex-col"
       onSubmit={handleJoin}
     >
-      <label className="flex flex-col gap-2 pb-6">
-        <span className="t-label text-sc-text">Display name</span>
-        <input
-          ref={nameRef}
-          autoFocus
-          value={name}
-          onChange={(e) => {
-            setName(e.target.value);
-            setNameHint(false);
-          }}
-          placeholder="e.g. Alex"
-          maxLength={32}
-          aria-invalid={nameHint}
-          aria-describedby={nameHint ? "start-name-hint" : undefined}
-          className={cn(
-            inputBase,
-            nameHint &&
-              "border-sc-danger hover:border-sc-danger focus-visible:border-sc-danger focus-visible:shadow-[0_0_0_4px_rgba(219,79,59,0.14)]",
-          )}
-        />
-        {nameHint ? (
-          <p id="start-name-hint" className="t-meta text-sc-danger" role="alert">
-            Enter a display name to create a room.
-          </p>
-        ) : null}
-      </label>
-
-      <div className={rail} aria-hidden />
-
-      <fieldset
-        className="m-0 flex min-w-0 flex-col gap-2 border-0 p-0 py-6"
-        aria-describedby={roleHint ? "start-role-hint" : undefined}
-      >
-        <legend className="mb-2 block w-full px-0 t-label text-sc-text">
-          Role
-        </legend>
-        <div className="grid grid-cols-2 gap-3">
-          <RoleCard
-            ref={deafRoleRef}
-            icon={<HandWaving size={24} weight="regular" />}
-            label="Deaf signer"
-            description="Sign on camera; your signs are reconstructed and spoken."
-            checked={role === "deaf"}
-            onSelect={() => {
-              setRole("deaf");
-              setRoleHint(false);
-            }}
-          />
-          <RoleCard
-            icon={<SpeakerHigh size={24} weight="regular" />}
-            label="Hearing peer"
-            description="Talk normally; your voice becomes captions on their tile."
-            checked={role === "hearing"}
-            onSelect={() => {
-              setRole("hearing");
-              setRoleHint(false);
-            }}
-          />
-        </div>
-        {roleHint ? (
-          <p id="start-role-hint" className="t-meta text-sc-danger" role="alert">
-            Choose whether you are signing or joining by voice.
-          </p>
-        ) : null}
-      </fieldset>
-
-      <div className={rail} aria-hidden />
-
-      {initialRoom.length > 0 ? (
-        /* shared-link path: room id is known, no create flow makes sense.
-         * fill name + role and the form's onSubmit goes to /room/<id>. */
-        <div className="flex flex-1 flex-col gap-3 pt-6">
-          <p className="t-meta text-sc-text-2">
-            Joining room{" "}
-            <code className="font-mono text-sc-text">{initialRoom}</code>
-          </p>
-          <button
-            type="submit"
-            disabled={!canJoin || submitting}
-            className="sc-luminous inline-flex h-12 w-full items-center justify-center rounded-sc-full px-6 text-[15px] font-medium transition-[transform,filter] duration-200 hover:-translate-y-px hover:brightness-105 active:translate-y-0 disabled:opacity-40 disabled:pointer-events-none"
-          >
-            Join room
-          </button>
-        </div>
-      ) : (
-        <div className="flex flex-1 flex-col gap-3 pt-6">
-          <button
-            type="button"
-            disabled={submitting}
-            onClick={handleCreateRoom}
-            className="sc-luminous inline-flex h-12 w-full items-center justify-center rounded-sc-full px-6 text-[15px] font-medium transition-[transform,filter] duration-200 hover:-translate-y-px hover:brightness-105 active:translate-y-0 disabled:opacity-40 disabled:pointer-events-none"
-          >
-            Create new room
-          </button>
-
-          <div className="my-1 flex items-center gap-3 text-sc-text-3">
-            <span className="h-px min-w-0 flex-1 bg-[#e3e3e2]" />
-            <span className="t-meta uppercase">or join existing</span>
-            <span className="h-px min-w-0 flex-1 bg-[#e3e3e2]" />
-          </div>
-
-          <div className="flex gap-2">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-x-10 md:gap-y-0">
+        {/* left column — who you are */}
+        <div className="flex min-w-0 flex-col">
+          <label className="flex flex-col gap-2 pb-6">
+            <span className="t-label text-sc-text">Display name</span>
             <input
-              value={roomCode}
-              onChange={(e) => setRoomCode(e.target.value)}
-              placeholder="room code"
+              ref={nameRef}
+              autoFocus
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setNameHint(false);
+              }}
+              placeholder="e.g. Alex"
               maxLength={32}
-              className={cn(inputBase, "flex-1")}
+              aria-invalid={nameHint}
+              aria-describedby={nameHint ? "start-name-hint" : undefined}
+              className={cn(
+                inputBase,
+                nameHint &&
+                  "border-sc-danger hover:border-sc-danger focus-visible:border-sc-danger focus-visible:shadow-[0_0_0_4px_rgba(219,79,59,0.14)]",
+              )}
             />
-            <button
-              type="submit"
-              disabled={!canJoin || submitting}
-              className="sc-btn-secondary inline-flex h-10 items-center justify-center rounded-sc-full px-5 t-label hover:-translate-y-px disabled:opacity-40 disabled:pointer-events-none"
-            >
-              Join
-            </button>
-          </div>
+            {nameHint ? (
+              <p id="start-name-hint" className="t-meta text-sc-danger" role="alert">
+                Enter a display name to create a room.
+              </p>
+            ) : null}
+          </label>
+
+          <div className={cn(rail, "md:hidden")} aria-hidden />
+
+          <fieldset
+            className="m-0 flex min-w-0 flex-col gap-2 border-0 p-0 py-6 md:py-0"
+            aria-describedby={roleHint ? "start-role-hint" : undefined}
+          >
+            <legend className="mb-2 block w-full px-0 t-label text-sc-text">
+              Role
+            </legend>
+            <div className="grid grid-cols-2 gap-3">
+              <RoleCard
+                ref={deafRoleRef}
+                icon={<HandWaving size={24} weight="regular" />}
+                label="Deaf signer"
+                description="Sign on camera; your signs are reconstructed and spoken."
+                checked={role === "deaf"}
+                onSelect={() => {
+                  setRole("deaf");
+                  setRoleHint(false);
+                }}
+              />
+              <RoleCard
+                icon={<SpeakerHigh size={24} weight="regular" />}
+                label="Hearing peer"
+                description="Talk normally; your voice becomes captions on their tile."
+                checked={role === "hearing"}
+                onSelect={() => {
+                  setRole("hearing");
+                  setRoleHint(false);
+                }}
+              />
+            </div>
+            {roleHint ? (
+              <p id="start-role-hint" className="t-meta text-sc-danger" role="alert">
+                Choose whether you are signing or joining by voice.
+              </p>
+            ) : null}
+          </fieldset>
         </div>
-      )}
+
+        {/* right column — what you're joining */}
+        <div className="flex min-w-0 flex-col md:border-l md:border-[#e3e3e2] md:pl-10">
+          <div className={cn(rail, "md:hidden")} aria-hidden />
+          {initialRoom.length > 0 ? (
+            <div className="flex flex-1 flex-col gap-3 pt-6 md:pt-0">
+              <span className="t-label text-sc-text">Joining room</span>
+              <p className="t-meta text-sc-text-2">
+                <code className="font-mono text-sc-text">{initialRoom}</code>
+              </p>
+              <button
+                type="submit"
+                disabled={!canJoin || submitting}
+                className="sc-luminous inline-flex h-12 w-full items-center justify-center rounded-sc-full px-6 text-[15px] font-medium transition-[transform,filter] duration-200 hover:-translate-y-px hover:brightness-105 active:translate-y-0 disabled:opacity-40 disabled:pointer-events-none"
+              >
+                Join room
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-1 flex-col gap-3 pt-6 md:pt-0">
+              <span className="t-label text-sc-text">Start fresh</span>
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={handleCreateRoom}
+                className="sc-luminous inline-flex h-12 w-full items-center justify-center rounded-sc-full px-6 text-[15px] font-medium transition-[transform,filter] duration-200 hover:-translate-y-px hover:brightness-105 active:translate-y-0 disabled:opacity-40 disabled:pointer-events-none"
+              >
+                Create new room
+              </button>
+
+              <div className="my-1 flex items-center gap-3 text-sc-text-3">
+                <span className="h-px min-w-0 flex-1 bg-[#e3e3e2]" />
+                <span className="t-meta uppercase">or join existing</span>
+                <span className="h-px min-w-0 flex-1 bg-[#e3e3e2]" />
+              </div>
+
+              <div className="flex gap-2">
+                <input
+                  value={roomCode}
+                  onChange={(e) => setRoomCode(e.target.value)}
+                  placeholder="room code"
+                  maxLength={32}
+                  className={cn(inputBase, "flex-1")}
+                />
+                <button
+                  type="submit"
+                  disabled={!canJoin || submitting}
+                  className="sc-btn-secondary inline-flex h-10 items-center justify-center rounded-sc-full px-5 t-label hover:-translate-y-px disabled:opacity-40 disabled:pointer-events-none"
+                >
+                  Join
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       <button
         type="button"

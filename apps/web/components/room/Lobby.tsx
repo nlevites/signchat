@@ -18,8 +18,6 @@ import {
 } from "@/components/shells/PreflightShell";
 import { enumerateMediaDevices } from "@/lib/livekit/devices";
 
-const rail = "h-px w-full shrink-0 bg-[#e3e3e2]";
-
 export interface LobbyDeviceState {
   audioInputDeviceId: string;
   videoInputDeviceId: string;
@@ -161,121 +159,118 @@ export function Lobby({ roomId, displayName, role, onJoin, onCancel }: LobbyProp
         </p>
       </header>
 
-      <section className="flex flex-col gap-2 pb-6">
-        <span className="t-label text-sc-text">Camera preview</span>
-        <div className="relative">
-          <div className="sc-tile-placeholder relative aspect-[4/3] w-full overflow-hidden rounded-sc-lg border border-sc-border">
-            <video
-              ref={videoRef}
-              className="absolute inset-0 size-full -scale-x-100 object-cover"
-              autoPlay
-              playsInline
-              muted
-            />
-            {!camEnabled || !ready ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-sc-text-2">
-                <VideoCameraSlash size={28} weight="fill" />
-                <span className="t-body-sm">
-                  {!camEnabled
-                    ? "Camera off"
-                    : error
-                      ? "Preview blocked"
-                      : "Connecting camera…"}
-                </span>
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-[1.05fr_1fr] md:gap-x-10 md:gap-y-0">
+        {/* left column — camera preview + transport controls */}
+        <section className="flex min-w-0 flex-col gap-3">
+          <span className="t-label text-sc-text">Camera preview</span>
+          <div className="relative">
+            <div className="sc-tile-placeholder relative aspect-[4/3] w-full overflow-hidden rounded-sc-lg border border-sc-border">
+              <video
+                ref={videoRef}
+                className="absolute inset-0 size-full -scale-x-100 object-cover"
+                autoPlay
+                playsInline
+                muted
+              />
+              {!camEnabled || !ready ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-sc-text-2">
+                  <VideoCameraSlash size={28} weight="fill" />
+                  <span className="t-body-sm">
+                    {!camEnabled
+                      ? "Camera off"
+                      : error
+                        ? "Preview blocked"
+                        : "Connecting camera…"}
+                  </span>
+                </div>
+              ) : null}
+              <div className="absolute bottom-3 left-3 rounded-sc-full bg-black/55 px-3 py-1 text-[13px] font-medium text-white backdrop-blur">
+                {displayName} · you ({role})
               </div>
-            ) : null}
-            <div className="absolute bottom-3 left-3 rounded-sc-full bg-black/55 px-3 py-1 text-[13px] font-medium text-white backdrop-blur">
-              {displayName} · you ({role})
+            </div>
+
+            <div className="absolute -bottom-5 left-1/2 z-10 -translate-x-1/2">
+              <div className="flex items-center gap-2 rounded-sc-full border border-sc-border bg-sc-surface p-2 shadow-sc-md">
+                <ToggleControl
+                  label={micEnabled ? "Mute mic" : "Unmute mic"}
+                  onClick={() => setMicEnabled((v) => !v)}
+                  muted={!micEnabled}
+                >
+                  {micEnabled ? (
+                    <Microphone size={18} weight="fill" />
+                  ) : (
+                    <MicrophoneSlash size={18} weight="fill" />
+                  )}
+                </ToggleControl>
+                <ToggleControl
+                  label={camEnabled ? "Turn camera off" : "Turn camera on"}
+                  onClick={() => setCamEnabled((v) => !v)}
+                  muted={!camEnabled}
+                >
+                  {camEnabled ? (
+                    <VideoCamera size={18} weight="fill" />
+                  ) : (
+                    <VideoCameraSlash size={18} weight="fill" />
+                  )}
+                </ToggleControl>
+              </div>
             </div>
           </div>
+        </section>
 
-          <div className="absolute -bottom-5 left-1/2 z-10 -translate-x-1/2">
-            <div className="flex items-center gap-2 rounded-sc-full border border-sc-border bg-sc-surface p-2 shadow-sc-md">
-              <ToggleControl
-                label={micEnabled ? "Mute mic" : "Unmute mic"}
-                onClick={() => setMicEnabled((v) => !v)}
-                muted={!micEnabled}
-              >
-                {micEnabled ? (
-                  <Microphone size={18} weight="fill" />
-                ) : (
-                  <MicrophoneSlash size={18} weight="fill" />
-                )}
-              </ToggleControl>
-              <ToggleControl
-                label={camEnabled ? "Turn camera off" : "Turn camera on"}
-                onClick={() => setCamEnabled((v) => !v)}
-                muted={!camEnabled}
-              >
-                {camEnabled ? (
-                  <VideoCamera size={18} weight="fill" />
-                ) : (
-                  <VideoCameraSlash size={18} weight="fill" />
-                )}
-              </ToggleControl>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <div className={rail} aria-hidden />
-
-      <fieldset className="m-0 flex flex-col gap-3 border-0 p-0 py-6">
-        <legend className="mb-2 block w-full px-0 t-label text-sc-text">
-          Devices
-        </legend>
-        <DevicePicker
-          kind="videoinput"
-          devices={videoInputs}
-          value={videoInputId}
-          onChange={setVideoInputId}
-        />
-        <DevicePicker
-          kind="audioinput"
-          devices={audioInputs}
-          value={audioInputId}
-          onChange={setAudioInputId}
-        />
-        <DevicePicker
-          kind="audiooutput"
-          devices={audioOutputs}
-          value={audioOutputId}
-          onChange={setAudioOutputId}
-        />
-        {error ? (
-          <p className="t-body-sm rounded-sc-md bg-sc-warning-subtle px-3 py-2 text-sc-warning">
-            {error}
-          </p>
-        ) : null}
-      </fieldset>
-
-      {role === "deaf" ? (
-        <>
-          <div className={rail} aria-hidden />
-          <fieldset className="m-0 flex flex-col gap-3 border-0 p-0 py-6">
-            <legend className="mb-2 block w-full px-0 t-label text-sc-text">
-              Voice
+        {/* right column — devices + voice + join */}
+        <section className="flex min-w-0 flex-col gap-5 md:border-l md:border-[#e3e3e2] md:pl-10 md:pt-0 pt-8">
+          <fieldset className="m-0 flex flex-col gap-3 border-0 p-0">
+            <legend className="block w-full px-0 t-label text-sc-text">
+              Devices
             </legend>
-            <p className="t-meta text-sc-text-2">
-              Pick the voice the hearing participant hears when you sign.
-              You can change it later from in-call settings.
-            </p>
-            <VoicePicker />
+            <DevicePicker
+              kind="videoinput"
+              devices={videoInputs}
+              value={videoInputId}
+              onChange={setVideoInputId}
+            />
+            <DevicePicker
+              kind="audioinput"
+              devices={audioInputs}
+              value={audioInputId}
+              onChange={setAudioInputId}
+            />
+            <DevicePicker
+              kind="audiooutput"
+              devices={audioOutputs}
+              value={audioOutputId}
+              onChange={setAudioOutputId}
+            />
+            {error ? (
+              <p className="t-body-sm rounded-sc-md bg-sc-warning-subtle px-3 py-2 text-sc-warning">
+                {error}
+              </p>
+            ) : null}
           </fieldset>
-        </>
-      ) : null}
 
-      <div className={rail} aria-hidden />
+          {role === "deaf" ? (
+            <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
+              <legend className="block w-full px-0 t-label text-sc-text">
+                Voice
+              </legend>
+              <p className="t-meta text-sc-text-2">
+                The voice the hearing participant hears when you sign.
+                Change it later from in-call settings.
+              </p>
+              <VoicePicker mode="dropdown" />
+            </fieldset>
+          ) : null}
 
-      <div className="flex flex-col gap-3 pt-6">
-        <button
-          type="button"
-          onClick={() => void handleJoin()}
-          disabled={!ready || joining}
-          className="sc-luminous inline-flex h-12 w-full items-center justify-center rounded-sc-full px-6 text-[15px] font-medium transition-[transform,filter] duration-200 hover:-translate-y-px hover:brightness-105 active:translate-y-0 disabled:opacity-40 disabled:pointer-events-none"
-        >
-          {joining ? "Joining…" : "Join now"}
-        </button>
+          <button
+            type="button"
+            onClick={() => void handleJoin()}
+            disabled={!ready || joining}
+            className="sc-luminous inline-flex h-12 w-full items-center justify-center rounded-sc-full px-6 text-[15px] font-medium transition-[transform,filter] duration-200 hover:-translate-y-px hover:brightness-105 active:translate-y-0 disabled:opacity-40 disabled:pointer-events-none"
+          >
+            {joining ? "Joining…" : "Join now"}
+          </button>
+        </section>
       </div>
 
       <button
